@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { CLASS_CONFIG } from '../utils/constants';
+import CanvasNavbar from './CanvasNavbar';
 
 type GridClass = keyof typeof CLASS_CONFIG;
 type GridArray = GridClass[][];
@@ -261,14 +262,40 @@ const MainArea: React.FC<MainAreaProps> = ({
   drawGridAndCells,
 }) => {
   const [statsAndScores, setStatsAndScores] = useState<{ percents: { [key in GridClass]: number }; scores: ScoreData }>(() => updateStatsAndScores());
+  const [isCalculated, setIsCalculated] = useState(false);
 
   useEffect(() => {
     setStatsAndScores(updateStatsAndScores());
+    setIsCalculated(false); // Reset calculation status when grid changes
   }, [gridClasses, gridSize, updateStatsAndScores]);
+
+  // Check if all pixels are filled
+  const isAllPixelsFilled = () => {
+    const totalCells = gridSize * gridSize;
+    let filledCells = 0;
+    for (let r = 0; r < gridSize; r++) {
+      for (let c = 0; c < gridSize; c++) {
+        const cls = gridClasses[r][c];
+        if (cls && cls !== "bos") {
+          filledCells++;
+        }
+      }
+    }
+    return filledCells === totalCells;
+  };
+
+  const handleCalculate = () => {
+    const newStats = updateStatsAndScores();
+    setStatsAndScores(newStats);
+    setIsCalculated(true);
+  };
+
+  const allFilled = isAllPixelsFilled();
 
 
   return (
     <main id="mainArea">
+      <CanvasNavbar />
       <CanvasArea
         gridCanvasRef={gridCanvasRef}
         baseImageRef={baseImageRef}
@@ -280,6 +307,16 @@ const MainArea: React.FC<MainAreaProps> = ({
         drawGridAndCells={drawGridAndCells}
         gridSize={gridSize}
       />
+      <div id="calculateSection">
+        <button
+          id="calculateBtn"
+          className={allFilled ? "active" : "disabled"}
+          onClick={handleCalculate}
+          disabled={!allFilled}
+        >
+          {isCalculated ? "✓ Calculated" : "Calculate"}
+        </button>
+      </div>
       <InfoPanel
         percents={statsAndScores.percents}
         scores={statsAndScores.scores}
