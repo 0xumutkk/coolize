@@ -51,26 +51,56 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({
     setIsPainting(false);
   };
 
-  useEffect(() => {
-    // Initial setup for fallback canvas if no image is loaded
-    if (!baseImageSrc && fallbackCanvasRef.current && gridCanvasRef.current) {
-      const rect = fallbackCanvasRef.current.getBoundingClientRect();
-      gridCanvasRef.current.width = rect.width;
-      gridCanvasRef.current.height = rect.height;
-      gridCanvasRef.current.style.width = rect.width + 'px';
-      gridCanvasRef.current.style.height = rect.height + 'px';
-      if (baseImageRef.current) {
-        baseImageRef.current.style.display = 'none';
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const syncCanvasSize = () => {
+    if (containerRef.current && gridCanvasRef.current) {
+      const containerRect = containerRef.current.getBoundingClientRect();
+      const containerWidth = Math.round(containerRect.width);
+      const containerHeight = Math.round(containerRect.height);
+      
+      // Set grid canvas size to match container
+      if (gridCanvasRef.current.width !== containerWidth || gridCanvasRef.current.height !== containerHeight) {
+        gridCanvasRef.current.width = containerWidth;
+        gridCanvasRef.current.height = containerHeight;
+        gridCanvasRef.current.style.width = containerWidth + 'px';
+        gridCanvasRef.current.style.height = containerHeight + 'px';
       }
-      fallbackCanvasRef.current.style.display = 'block';
+      
+      // If no image, setup fallback canvas
+      if (!baseImageSrc && fallbackCanvasRef.current) {
+        if (fallbackCanvasRef.current.width !== containerWidth || fallbackCanvasRef.current.height !== containerHeight) {
+          fallbackCanvasRef.current.width = containerWidth;
+          fallbackCanvasRef.current.height = containerHeight;
+          fallbackCanvasRef.current.style.width = containerWidth + 'px';
+          fallbackCanvasRef.current.style.height = containerHeight + 'px';
+        }
+        if (baseImageRef.current) {
+          baseImageRef.current.style.display = 'none';
+        }
+        fallbackCanvasRef.current.style.display = 'block';
+      }
+      
       drawGridAndCells();
     }
+  };
+
+  useEffect(() => {
+    syncCanvasSize();
+  }, [baseImageSrc, fallbackCanvasRef, gridCanvasRef, drawGridAndCells, gridSize, baseImageRef]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      syncCanvasSize();
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, [baseImageSrc, fallbackCanvasRef, gridCanvasRef, drawGridAndCells, gridSize, baseImageRef]);
 
 
   return (
     <div id="canvasWrapper">
-      <div id="canvasContainer">
+      <div id="canvasContainer" ref={containerRef}>
         <img
           id="baseImage"
           alt="Görsel henüz yüklenmedi"
@@ -88,10 +118,8 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({
         ></canvas>
         <canvas
           id="fallbackCanvas"
-          width="1000"
-          height="800"
           ref={fallbackCanvasRef}
-          style={{ display: baseImageSrc ? 'none' : 'block', width: '100%', maxWidth: '1200px', height: 'auto' }}
+          style={{ display: baseImageSrc ? 'none' : 'block' }}
         ></canvas>
       </div>
     </div>

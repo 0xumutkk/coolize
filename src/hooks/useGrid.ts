@@ -37,6 +37,11 @@ export const useGrid = () => {
   const fallbackCanvasRef = useRef<HTMLCanvasElement>(null);
 
   const getCanvasSize = useCallback((): CanvasSize => {
+    // Use gridCanvas's actual size (which matches container)
+    if (gridCanvasRef.current) {
+      return { width: gridCanvasRef.current.width, height: gridCanvasRef.current.height };
+    }
+    // Fallback to image or fallback canvas if gridCanvas not ready
     if (baseImageRef.current && baseImageRef.current.style.display !== "none") {
       const rect = baseImageRef.current.getBoundingClientRect();
       return { width: Math.round(rect.width), height: Math.round(rect.height) };
@@ -45,7 +50,7 @@ export const useGrid = () => {
       return { width: Math.round(rect.width), height: Math.round(rect.height) };
     }
     return { width: 600, height: 600 }; // Varsayılan boyut
-  }, []);
+  }, [gridCanvasRef, baseImageRef, fallbackCanvasRef]);
 
   const drawGridAndCells = useCallback(() => {
     const gridCanvas = gridCanvasRef.current;

@@ -505,11 +505,13 @@ label {
 /* Canvas Wrapper Styles */
 #canvasWrapper {
   width: 100%;
-  min-height: 80vh;
+  height: calc(100vh - 280px);
+  max-height: calc(100vh - 280px);
+  min-height: 400px;
   display: flex;
   justify-content: center;
   align-items: center;
-  overflow: auto;
+  overflow: hidden;
   border-radius: 16px;
   border: 1px solid rgba(31, 41, 55, 0.5);
   background: linear-gradient(135deg, rgba(2, 6, 23, 0.8) 0%, rgba(15, 23, 42, 0.6) 100%);
@@ -520,17 +522,16 @@ label {
 
 #canvasContainer {
   position: relative;
-  display: inline-block;
   width: 100%;
-  max-width: 1200px;
-  height: auto;
+  height: 100%;
+  display: block;
 }
 
 #baseImage {
   display: block;
   width: 100%;
-  max-width: 1200px;
-  height: auto;
+  height: 100%;
+  object-fit: contain;
   border-radius: 12px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
 }
@@ -547,12 +548,12 @@ label {
 
 #fallbackCanvas {
   width: 100%;
-  max-width: 1200px;
-  height: auto;
+  height: 100%;
   background: linear-gradient(135deg, rgba(2, 6, 23, 0.9) 0%, rgba(15, 23, 42, 0.7) 100%);
   border-radius: 12px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
   display: block;
+  object-fit: contain;
 }
 
 /* Info Panel Styles */
@@ -563,6 +564,8 @@ label {
   min-height: 150px;
   flex-shrink: 0;
   margin-top: 16px;
+  overflow-y: auto;
+  max-height: 200px;
 }
 
 #percents,
@@ -712,10 +715,17 @@ label {
     height: calc(100vh - 40vh);
     flex: 1;
     overflow-y: auto;
+    overflow-x: hidden;
   }
   
   #canvasWrapper {
-    min-height: 60vh;
+    height: calc(100vh - 40vh - 250px);
+    max-height: calc(100vh - 40vh - 250px);
+    min-height: 300px;
+  }
+  
+  #infoPanel {
+    max-height: 150px;
   }
   
   #infoPanel {
