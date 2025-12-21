@@ -165,7 +165,7 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({
       <div id="canvasContainer" ref={containerRef}>
         <img
           id="baseImage"
-          alt="Görsel henüz yüklenmedi"
+          alt="Image not loaded yet"
           ref={baseImageRef}
           src={baseImageSrc || undefined}
           style={{ display: baseImageSrc ? 'block' : 'none' }}
@@ -186,7 +186,7 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({
         <button
           id="fullscreenBtn"
           onClick={toggleFullscreen}
-          title={isFullscreen ? "Tam ekrandan çık" : "Tam ekran yap"}
+            title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
           className={isFullscreen ? "fullscreen-active" : ""}
         >
           {isFullscreen ? "⤓" : "⤢"}
@@ -218,13 +218,13 @@ const PercentsPanel: React.FC<PercentsPanelProps> = ({ percents, calculateButton
 
   return (
     <div id="percentsPanel">
-      <h3>📊 Alan Dağılımı</h3>
+      <h3>Area Distribution</h3>
       <div className="percents-table-wrapper">
         <table>
           <thead>
             <tr>
-              <th>Yüzey Türü</th>
-              <th>Yüzde</th>
+              <th>Surface Type</th>
+              <th>Percentage</th>
             </tr>
           </thead>
           <tbody id="percentTableBody">
@@ -255,12 +255,12 @@ const ScoresPanel: React.FC<ScoresPanelProps> = ({ scores }) => {
 
   const getScoreLabel = (key: string) => {
     const labels: { [key: string]: string } = {
-      NEI: 'Doğa Entegrasyonu',
-      SWE: 'Su Yönetimi',
-      HEAT: 'Isı Yönetimi',
-      TCI: 'Termal Konfor',
-      BCI: 'Biyoiklim',
-      UCIS: 'Toplam Skor'
+      NEI: 'Nature Integration',
+      SWE: 'Water Management',
+      HEAT: 'Heat Management',
+      TCI: 'Thermal Comfort',
+      BCI: 'Bioclimate',
+      UCIS: 'Total Score'
     };
     return labels[key] || key;
   };
@@ -276,7 +276,7 @@ const ScoresPanel: React.FC<ScoresPanelProps> = ({ scores }) => {
 
   return (
     <div id="scoresPanel">
-      <h3>⭐ Score Results</h3>
+      <h3>Score Results</h3>
       
       {/* UCIS Speedometer */}
       <div id="ucisSpeedometer">
@@ -305,23 +305,65 @@ const ScoresPanel: React.FC<ScoresPanelProps> = ({ scores }) => {
         ))}
       </div>
 
-      {/* Summarize Section */}
-      <div id="summarizeSection">
-        <h4>📋 Summarize</h4>
-        <div className="summarize-content">
-          {generateSummary(ucisScore, indexScores)}
+    </div>
+  );
+};
+
+interface SummarizePanelProps {
+  scores: ScoreData;
+  isOpen: boolean;
+  onToggle: () => void;
+}
+
+const SummarizePanel: React.FC<SummarizePanelProps> = ({ scores, isOpen, onToggle }) => {
+  const getScoreLabel = (key: string) => {
+    const labels: { [key: string]: string } = {
+      NEI: 'Nature Integration',
+      SWE: 'Water Management',
+      HEAT: 'Heat Management',
+      TCI: 'Thermal Comfort',
+      BCI: 'Bioclimate',
+      UCIS: 'Total Score'
+    };
+    return labels[key] || key;
+  };
+
+  const ucisScore = scores.UCIS;
+  const indexScores = [
+    { key: 'NEI', value: scores.NEI, label: getScoreLabel('NEI') },
+    { key: 'SWE', value: scores.SWE, label: getScoreLabel('SWE') },
+    { key: 'HEAT', value: scores.HEAT, label: getScoreLabel('HEAT') },
+    { key: 'TCI', value: scores.TCI, label: getScoreLabel('TCI') },
+    { key: 'BCI', value: scores.BCI, label: getScoreLabel('BCI') },
+  ];
+
+  return (
+    <div id="summarizeWrapper">
+      <button 
+        id="summarizeToggleBtn"
+        onClick={onToggle}
+        className={isOpen ? 'open' : ''}
+      >
+        <span>Summarize</span>
+        <span className="toggle-icon">{isOpen ? '−' : '+'}</span>
+      </button>
+      {isOpen && (
+        <div id="summarizeSection">
+          <div className="summarize-content">
+            {generateSummary(ucisScore, indexScores)}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
 
 const generateSummary = (ucisScore: number, indexScores: Array<{ key: string; value: number; label: string }>) => {
   const getScoreLevel = (score: number) => {
-    if (score >= 80) return { level: 'excellent', emoji: '🌟', color: '#22c55e' };
-    if (score >= 60) return { level: 'good', emoji: '✅', color: '#84cc16' };
-    if (score >= 40) return { level: 'moderate', emoji: '⚠️', color: '#fbbf24' };
-    return { level: 'needs_improvement', emoji: '🔴', color: '#ef4444' };
+    if (score >= 80) return { level: 'excellent', emoji: '', color: '#22c55e' };
+    if (score >= 60) return { level: 'good', emoji: '', color: '#84cc16' };
+    if (score >= 40) return { level: 'moderate', emoji: '', color: '#fbbf24' };
+    return { level: 'needs_improvement', emoji: '', color: '#ef4444' };
   };
 
   const ucisLevel = getScoreLevel(ucisScore);
@@ -331,16 +373,15 @@ const generateSummary = (ucisScore: number, indexScores: Array<{ key: string; va
   const weakestIndex = indexScores.reduce((min, item) => item.value < min.value ? item : min, indexScores[0]);
 
   const sentences = [
-    `UrbanCool.ai City Index Score (UCIS) değeriniz ${ucisScore.toFixed(0)} puan ile ${ucisLevel.level === 'excellent' ? 'mükemmel' : ucisLevel.level === 'good' ? 'iyi' : ucisLevel.level === 'moderate' ? 'orta' : 'iyileştirme gerektiren'} bir seviyede.`,
-    `En güçlü alanınız ${strongestIndex.label} (${strongestIndex.value.toFixed(0)} puan), en zayıf alanınız ise ${weakestIndex.label} (${weakestIndex.value.toFixed(0)} puan) olarak öne çıkıyor.`,
-    `Ortalama indeks skorunuz ${avgIndex.toFixed(0)} puan. Bu sonuçlar, projenizin ${ucisLevel.level === 'excellent' ? 'sürdürülebilir şehir gelişimi açısından örnek teşkil ettiğini' : ucisLevel.level === 'good' ? 'iyi bir sürdürülebilirlik seviyesinde olduğunu' : ucisLevel.level === 'moderate' ? 'orta seviyede bir sürdürülebilirlik gösterdiğini' : 'sürdürülebilirlik açısından iyileştirme potansiyeli olduğunu'} gösteriyor.`,
-    `${strongestIndex.label} alanındaki güçlü performansınızı koruyarak, ${weakestIndex.label} alanında yapılacak iyileştirmelerle UCIS skorunuzu daha da artırabilirsiniz.`
+    `Your UrbanCool.ai City Index Score (UCIS) value of ${ucisScore.toFixed(0)} points indicates a ${ucisLevel.level === 'excellent' ? 'excellent' : ucisLevel.level === 'good' ? 'good' : ucisLevel.level === 'moderate' ? 'moderate' : 'needs improvement'} level.`,
+    `Your strongest area is ${strongestIndex.label} (${strongestIndex.value.toFixed(0)} points), while your weakest area is ${weakestIndex.label} (${weakestIndex.value.toFixed(0)} points).`,
+    `Your average index score is ${avgIndex.toFixed(0)} points. These results show that your project ${ucisLevel.level === 'excellent' ? 'exemplifies sustainable urban development' : ucisLevel.level === 'good' ? 'is at a good sustainability level' : ucisLevel.level === 'moderate' ? 'shows moderate sustainability' : 'has potential for improvement in terms of sustainability'}.`,
+    `By maintaining your strong performance in ${strongestIndex.label}, you can further increase your UCIS score with improvements in the ${weakestIndex.label} area.`
   ];
 
   return (
     <div className="summarize-text">
       <div className="summary-header">
-        <span className="summary-emoji" style={{ color: ucisLevel.color }}>{ucisLevel.emoji}</span>
         <span className="summary-score" style={{ color: ucisLevel.color }}>{ucisScore.toFixed(0)} UCIS</span>
       </div>
       {sentences.map((sentence, index) => (
@@ -408,7 +449,7 @@ const MainArea: React.FC<MainAreaProps> = ({
   };
 
   const allFilled = isAllPixelsFilled();
-
+  const [isSummarizeOpen, setIsSummarizeOpen] = useState(false);
 
   return (
     <main id="mainArea">
@@ -427,18 +468,28 @@ const MainArea: React.FC<MainAreaProps> = ({
         <PercentsPanel 
           percents={statsAndScores.percents}
           calculateButton={
-            <button
-              id="calculateBtn"
-              className={allFilled ? "active" : "disabled"}
-              onClick={handleCalculate}
-              disabled={!allFilled}
-            >
-              {isCalculated ? "✓ Calculated" : "Calculate"}
-            </button>
+            <div className="calculate-btn-wrapper">
+              <button
+                id="calculateBtn"
+                className={allFilled ? "active" : "disabled"}
+                onClick={handleCalculate}
+                disabled={!allFilled}
+              >
+                {isCalculated ? "Calculated" : "Calculate"}
+              </button>
+              {!allFilled && (
+                <div className="calculate-tooltip">All pixels must be filled</div>
+              )}
+            </div>
           }
         />
       </div>
       <ScoresPanel scores={statsAndScores.scores} />
+      <SummarizePanel 
+        scores={statsAndScores.scores}
+        isOpen={isSummarizeOpen}
+        onToggle={() => setIsSummarizeOpen(!isSummarizeOpen)}
+      />
     </main>
   );
 };

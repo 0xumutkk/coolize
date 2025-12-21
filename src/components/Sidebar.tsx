@@ -98,17 +98,13 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <aside id="sidebar">
-      <div className="sidebar-header">
-        <h1>🌳 UrbanCool.ai</h1>
-        <small>UCIS Grid Analiz Aracı</small>
-      </div>
 
       <div className="section">
         <div className="section-header">
           <span className="section-number">1</span>
-          <h2>Görsel Yükle</h2>
+          <h2>Upload Image</h2>
         </div>
-        <label htmlFor="imageLoader">Plan / üstten görünüş (PNG/JPEG)</label>
+        <label htmlFor="imageLoader">Plan / top view (PNG/JPEG)</label>
         <div className="file-input-wrapper">
           <input
             type="file"
@@ -118,19 +114,18 @@ const Sidebar: React.FC<SidebarProps> = ({
             className="file-input"
           />
           <label htmlFor="imageLoader" className="file-input-label">
-            <span className="file-input-icon">📁</span>
-            <span className="file-input-text">Dosya Seç</span>
+            <span className="file-input-icon">📄</span>
+            <span className="file-input-text">Select File</span>
           </label>
         </div>
-        <p className="help-text">💡 İstersen görsel yüklemeden de grid üzerinde çalışabilirsin.</p>
       </div>
 
       <div className="section">
         <div className="section-header">
           <span className="section-number">2</span>
-          <h2>Grid Çözünürlüğü</h2>
+          <h2>Grid Resolution</h2>
         </div>
-        <label htmlFor="gridSizeSelect">Hücre sayısı (N x N)</label>
+        <label htmlFor="gridSizeSelect">Cell count (N x N)</label>
         <div className="select-wrapper">
           <select
             id="gridSizeSelect"
@@ -138,10 +133,10 @@ const Sidebar: React.FC<SidebarProps> = ({
             value={gridSize}
             className="custom-select"
           >
-            <option value="25">🚀 25 x 25 (çok hızlı)</option>
-            <option value="50">⚡ 50 x 50 (hızlı)</option>
-            <option value="75">⚖️ 75 x 75 (orta)</option>
-            <option value="100">🎯 100 x 100 (detaylı)</option>
+            <option value="25">25 x 25 (very fast)</option>
+            <option value="50">50 x 50 (fast)</option>
+            <option value="75">75 x 75 (medium)</option>
+            <option value="100">100 x 100 (detailed)</option>
           </select>
         </div>
       </div>
@@ -149,9 +144,9 @@ const Sidebar: React.FC<SidebarProps> = ({
       <div className="section">
         <div className="section-header">
           <span className="section-number">3</span>
-          <h2>Yüzey / NBS Paleti</h2>
+          <h2>Surface / NBS Palette</h2>
         </div>
-        <p className="instruction-text">🎨 Bir kategori seç → alt seçeneklerden seçim yap</p>
+        <p className="instruction-text">Select a category → choose from sub-options</p>
         <div id="palette-categories">
           {/* Vegetation Category */}
           <div className="palette-category">
@@ -175,7 +170,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                     title={item.label}
                   >
                     <span className="palette-item-label">{item.label}</span>
-                    {currentClass === item.id && <span className="palette-item-check">✓</span>}
+                    {currentClass === item.id && <span className="palette-item-check">●</span>}
                   </button>
                 ))}
               </div>
@@ -204,7 +199,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                     title={item.label}
                   >
                     <span className="palette-item-label">{item.label}</span>
-                    {currentClass === item.id && <span className="palette-item-check">✓</span>}
+                    {currentClass === item.id && <span className="palette-item-check">●</span>}
                   </button>
                 ))}
               </div>
@@ -233,7 +228,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                     title={item.label}
                   >
                     <span className="palette-item-label">{item.label}</span>
-                    {currentClass === item.id && <span className="palette-item-check">✓</span>}
+                    {currentClass === item.id && <span className="palette-item-check">●</span>}
                   </button>
                 ))}
               </div>
@@ -276,12 +271,11 @@ const Sidebar: React.FC<SidebarProps> = ({
                   top: `${mapMarker.y}%`,
                 }}
               >
-                📍
               </div>
             )}
             {!mapMarker && (
               <div className="map-placeholder">
-                <span className="map-placeholder-icon">🗺️</span>
+                <span className="map-placeholder-icon"></span>
                 <span className="map-placeholder-text">Click to set location</span>
               </div>
             )}
