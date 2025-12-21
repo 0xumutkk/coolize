@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { CLASS_CONFIG } from '../utils/constants';
 import Speedometer from './Speedometer';
 import CanvasNavbar from './CanvasNavbar';
+import CoolStrategies from './CoolStrategies';
 
 type GridClass = keyof typeof CLASS_CONFIG;
 type GridArray = GridClass[][];
@@ -148,7 +149,7 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({
 
   useEffect(() => {
     syncCanvasSize();
-  }, [baseImageSrc, fallbackCanvasRef, gridCanvasRef, drawGridAndCells, gridSize, baseImageRef]);
+  }, [baseImageSrc, fallbackCanvasRef, gridCanvasRef, drawGridAndCells, gridSize, baseImageRef, syncCanvasSize]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -156,41 +157,123 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({
     };
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, [baseImageSrc, fallbackCanvasRef, gridCanvasRef, drawGridAndCells, gridSize, baseImageRef]);
+  }, [syncCanvasSize]);
 
+
+  const [rulerSize, setRulerSize] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    const updateRulerSize = () => {
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        setRulerSize({ width: rect.width, height: rect.height });
+      }
+    };
+    // Initial update
+    const timer = setTimeout(updateRulerSize, 100);
+    const handleResize = () => {
+      setTimeout(updateRulerSize, 50);
+    };
+    window.addEventListener('resize', handleResize);
+    // Also update when canvas size changes
+    const interval = setInterval(updateRulerSize, 200);
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [baseImageSrc, gridSize]);
+
+  const renderRuler = (orientation: 'horizontal' | 'vertical') => {
+    if (rulerSize.width === 0 || rulerSize.height === 0) return null;
+    
+    const isHorizontal = orientation === 'horizontal';
+    const length = isHorizontal ? rulerSize.width : rulerSize.height;
+    const rulerSize_px = 24;
+    
+    // Calculate tick interval based on grid size
+    const cellsPerTick = Math.max(1, Math.floor(gridSize / 20));
+    const cellSize = length / gridSize;
+    const tickInterval = cellSize * cellsPerTick;
+    
+    const ticks = [];
+    const majorTickInterval = tickInterval * 5;
+    
+    for (let i = 0; i <= length; i += tickInterval) {
+      const isMajorTick = Math.abs(i % majorTickInterval) < tickInterval / 2 || i === 0 || i >= length - tickInterval / 2;
+      const cellIndex = Math.round((i / length) * gridSize);
+      ticks.push({
+        position: i,
+        isMajor: isMajorTick,
+        label: isMajorTick ? cellIndex : null
+      });
+    }
+
+    return (
+      <div 
+        className={`ruler ${orientation}`}
+        style={{
+          width: isHorizontal ? length : rulerSize_px,
+          height: isHorizontal ? rulerSize_px : length
+        }}
+      >
+        {ticks.map((tick, idx) => (
+          <div
+            key={idx}
+            className={`ruler-tick ${tick.isMajor ? 'major' : 'minor'}`}
+            style={
+              isHorizontal
+                ? { left: `${tick.position}px` }
+                : { top: `${tick.position}px` }
+            }
+          >
+            {tick.label !== null && (
+              <span className="ruler-label">{tick.label}</span>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  };
 
   return (
     <div id="canvasWrapper" ref={fullscreenContainerRef}>
       <CanvasNavbar />
-      <div id="canvasContainer" ref={containerRef}>
-        <img
-          id="baseImage"
-          alt="Image not loaded yet"
-          ref={baseImageRef}
-          src={baseImageSrc || undefined}
-          style={{ display: baseImageSrc ? 'block' : 'none' }}
-        />
-        <canvas
-          id="gridCanvas"
-          ref={gridCanvasRef}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp} // Mouse kanvastan çıktığında çizimi durdur
-        ></canvas>
-        <canvas
-          id="fallbackCanvas"
-          ref={fallbackCanvasRef}
-          style={{ display: baseImageSrc ? 'none' : 'block' }}
-        ></canvas>
-        <button
-          id="fullscreenBtn"
-          onClick={toggleFullscreen}
-            title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
-          className={isFullscreen ? "fullscreen-active" : ""}
-        >
-          {isFullscreen ? "⤓" : "⤢"}
-        </button>
+      <div id="canvasWithRulers">
+        {renderRuler('horizontal')}
+        <div id="canvasRulerContainer">
+          {renderRuler('vertical')}
+          <div id="canvasContainer" ref={containerRef}>
+            <img
+              id="baseImage"
+              alt="Image not loaded yet"
+              ref={baseImageRef}
+              src={baseImageSrc || undefined}
+              style={{ display: baseImageSrc ? 'block' : 'none' }}
+            />
+            <canvas
+              id="gridCanvas"
+              ref={gridCanvasRef}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseUp}
+            ></canvas>
+            <canvas
+              id="fallbackCanvas"
+              ref={fallbackCanvasRef}
+              style={{ display: baseImageSrc ? 'none' : 'block' }}
+            ></canvas>
+            <button
+              id="fullscreenBtn"
+              onClick={toggleFullscreen}
+              title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+              className={isFullscreen ? "fullscreen-active" : ""}
+            >
+              {isFullscreen ? "⤓" : "⤢"}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -248,9 +331,11 @@ const PercentsPanel: React.FC<PercentsPanelProps> = ({ percents, calculateButton
 
 interface ScoresPanelProps {
   scores: ScoreData;
+  isSummarizeOpen: boolean;
+  onSummarizeToggle: () => void;
 }
 
-const ScoresPanel: React.FC<ScoresPanelProps> = ({ scores }) => {
+const ScoresPanel: React.FC<ScoresPanelProps> = ({ scores, isSummarizeOpen, onSummarizeToggle }) => {
 
 
   const getScoreLabel = (key: string) => {
@@ -305,58 +390,28 @@ const ScoresPanel: React.FC<ScoresPanelProps> = ({ scores }) => {
         ))}
       </div>
 
-    </div>
-  );
-};
-
-interface SummarizePanelProps {
-  scores: ScoreData;
-  isOpen: boolean;
-  onToggle: () => void;
-}
-
-const SummarizePanel: React.FC<SummarizePanelProps> = ({ scores, isOpen, onToggle }) => {
-  const getScoreLabel = (key: string) => {
-    const labels: { [key: string]: string } = {
-      NEI: 'Nature Integration',
-      SWE: 'Water Management',
-      HEAT: 'Heat Management',
-      TCI: 'Thermal Comfort',
-      BCI: 'Bioclimate',
-      UCIS: 'Total Score'
-    };
-    return labels[key] || key;
-  };
-
-  const ucisScore = scores.UCIS;
-  const indexScores = [
-    { key: 'NEI', value: scores.NEI, label: getScoreLabel('NEI') },
-    { key: 'SWE', value: scores.SWE, label: getScoreLabel('SWE') },
-    { key: 'HEAT', value: scores.HEAT, label: getScoreLabel('HEAT') },
-    { key: 'TCI', value: scores.TCI, label: getScoreLabel('TCI') },
-    { key: 'BCI', value: scores.BCI, label: getScoreLabel('BCI') },
-  ];
-
-  return (
-    <div id="summarizeWrapper">
-      <button 
-        id="summarizeToggleBtn"
-        onClick={onToggle}
-        className={isOpen ? 'open' : ''}
-      >
-        <span>Summarize</span>
-        <span className="toggle-icon">{isOpen ? '−' : '+'}</span>
-      </button>
-      {isOpen && (
-        <div id="summarizeSection">
-          <div className="summarize-content">
-            {generateSummary(ucisScore, indexScores)}
+      {/* Summarize Section */}
+      <div id="summarizeWrapper">
+        <button 
+          id="summarizeToggleBtn"
+          onClick={onSummarizeToggle}
+          className={isSummarizeOpen ? 'open' : ''}
+        >
+          <span>Summarize</span>
+          <span className="toggle-icon">{isSummarizeOpen ? '−' : '+'}</span>
+        </button>
+        {isSummarizeOpen && (
+          <div id="summarizeSection">
+            <div className="summarize-content">
+              {generateSummary(ucisScore, indexScores)}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };
+
 
 const generateSummary = (ucisScore: number, indexScores: Array<{ key: string; value: number; label: string }>) => {
   const getScoreLevel = (score: number) => {
@@ -484,12 +539,12 @@ const MainArea: React.FC<MainAreaProps> = ({
           }
         />
       </div>
-      <ScoresPanel scores={statsAndScores.scores} />
-      <SummarizePanel 
+      <ScoresPanel 
         scores={statsAndScores.scores}
-        isOpen={isSummarizeOpen}
-        onToggle={() => setIsSummarizeOpen(!isSummarizeOpen)}
+        isSummarizeOpen={isSummarizeOpen}
+        onSummarizeToggle={() => setIsSummarizeOpen(!isSummarizeOpen)}
       />
+      <CoolStrategies scores={statsAndScores.scores} />
     </main>
   );
 };
