@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 
 interface LandingPageProps {
   onEnterApp: () => void;
@@ -7,70 +7,205 @@ interface LandingPageProps {
 const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
   const carouselRef = useRef<HTMLDivElement>(null);
 
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [activeSection, setActiveSection] = useState<string>('hero');
+
   const scrollCarousel = (direction: 'left' | 'right') => {
     if (carouselRef.current) {
-      const scrollAmount = 400;
-      const currentScroll = carouselRef.current.scrollLeft;
-      const targetScroll = direction === 'left' 
-        ? currentScroll - scrollAmount 
-        : currentScroll + scrollAmount;
-      
+      const container = carouselRef.current;
+      const firstCard = container.querySelector<HTMLElement>('.tool-card');
+      const cardWidth = firstCard ? firstCard.offsetWidth + 16 : 400;
+      const scrollAmount = cardWidth;
+      const currentScroll = container.scrollLeft;
+      const maxScrollLeft = container.scrollWidth - container.clientWidth;
+      const targetScroll = direction === 'left'
+        ? Math.max(0, currentScroll - scrollAmount)
+        : Math.min(maxScrollLeft, currentScroll + scrollAmount);
+
       carouselRef.current.scrollTo({
         left: targetScroll,
         behavior: 'smooth'
       });
     }
   };
+
+  const handleNavClick = (sectionId: string) => {
+    setIsMobileMenuOpen(false);
+    setActiveSection(sectionId);
+  };
+
+  const handleLoginClick = () => {
+    window.alert('Login functionality is coming soon.');
+  };
+
+  const handleCarouselKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'ArrowRight') {
+      event.preventDefault();
+      scrollCarousel('right');
+    } else if (event.key === 'ArrowLeft') {
+      event.preventDefault();
+      scrollCarousel('left');
+    }
+  };
+
+  useEffect(() => {
+    const sectionIds = ['hero', 'features', 'how-it-works', 'pricing', 'company', 'faq', 'blog'];
+
+    const handleScroll = () => {
+      let current = 'hero';
+      const offset = 140;
+
+      sectionIds.forEach((id) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const rect = el.getBoundingClientRect();
+        if (rect.top <= offset && rect.bottom > offset) {
+          current = id;
+        }
+      });
+
+      setActiveSection(current);
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
   return (
     <div id="landing-page">
+      {/* Skip link for screen readers and keyboard users */}
+      <a href="#main-content" className="skip-link">
+        Skip to main content
+      </a>
+
       {/* Navigation Bar */}
-      <nav className="landing-navbar">
+      <nav className="landing-navbar" aria-label="Main navigation">
         <div className="navbar-container">
           <div className="navbar-left">
             <div className="navbar-logo">Coolize</div>
-            <div className="navbar-menu">
+            <div className={`navbar-menu ${isMobileMenuOpen ? 'open' : ''}`}>
               <div className="nav-link-wrapper">
-                <a href="#features" className="nav-link">Product</a>
+                <a
+                  href="#features"
+                  className={`nav-link ${activeSection === 'features' ? 'active' : ''}`}
+                  onClick={() => handleNavClick('features')}
+                >
+                  Product
+                </a>
                 <span className="nav-arrow">▼</span>
               </div>
-              <a href="#how-it-works" className="nav-link">How It Works</a>
-              <a href="#pricing" className="nav-link">Pricing</a>
-              <a href="#company" className="nav-link">Company</a>
-              <a href="#blog" className="nav-link">Blog</a>
+              <a
+                href="#how-it-works"
+                className={`nav-link ${activeSection === 'how-it-works' ? 'active' : ''}`}
+                onClick={() => handleNavClick('how-it-works')}
+              >
+                How It Works
+              </a>
+              <a
+                href="#pricing"
+                className={`nav-link ${activeSection === 'pricing' ? 'active' : ''}`}
+                onClick={() => handleNavClick('pricing')}
+              >
+                Pricing
+              </a>
+              <a
+                href="#company"
+                className={`nav-link ${activeSection === 'company' ? 'active' : ''}`}
+                onClick={() => handleNavClick('company')}
+              >
+                Company
+              </a>
+              <a
+                href="#blog"
+                className={`nav-link ${activeSection === 'blog' ? 'active' : ''}`}
+                onClick={() => handleNavClick('blog')}
+              >
+                Blog
+              </a>
             </div>
           </div>
           <div className="navbar-right">
-            <button className="nav-btn login">Log In</button>
+            <button 
+              className="navbar-toggle" 
+              aria-label={isMobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+              aria-expanded={isMobileMenuOpen}
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            >
+              ☰
+            </button>
+            <button className="nav-btn login" onClick={handleLoginClick}>Log In</button>
             <button className="nav-btn signup" onClick={onEnterApp}>Sign Up</button>
           </div>
         </div>
       </nav>
 
+      <main id="main-content" role="main">
       {/* Hero Section */}
-      <section className="hero-section">
+      <section id="hero" className="hero-section" aria-labelledby="hero-title">
         <div className="hero-container">
           <div className="hero-left">
             <div className="hero-badge">#1 ONLINE CLIMATE ANALYSIS TOOL</div>
-            <h1 className="hero-title">Climate Score Analysis</h1>
+            <h1 id="hero-title" className="hero-title">Climate Score Analysis</h1>
             <p className="hero-description">
-              Say goodbye to complex climate assessments - with one click, our AI will analyze your urban area's climate performance for you.
+              Turn complex climate assessments into a clear, visual climate score. Upload your urban area once, and let our AI handle the heavy analysis for you.
             </p>
             <button className="hero-cta" onClick={onEnterApp}>Get Started</button>
+            <div className="scroll-hint">
+              Scroll to see how Coolize works ↓
+            </div>
           </div>
           <div className="hero-right">
             <div className="hero-image-grid">
-              <div className="grid-item item-1"></div>
-              <div className="grid-item item-2"></div>
-              <div className="grid-item item-3"></div>
-              <div className="grid-item item-4"></div>
-              <div className="grid-item item-5"></div>
+              <div className="grid-item item-1">
+                <img
+                  src="/hero-grid-1.png"
+                  alt="Urban climate analysis overview"
+                  className="grid-item-image"
+                  loading="lazy"
+                />
+              </div>
+              <div className="grid-item item-2">
+                <img
+                  src="/hero-grid-2.png"
+                  alt="Project area heat map preview"
+                  className="grid-item-image"
+                  loading="lazy"
+                />
+              </div>
+              <div className="grid-item item-3">
+                <img
+                  src="/hero-grid-3.png"
+                  alt="Climate score breakdown card"
+                  className="grid-item-image"
+                  loading="lazy"
+                />
+              </div>
+              <div className="grid-item item-4">
+                <img
+                  src="/hero-grid-4.png"
+                  alt="Green space optimization diagram"
+                  className="grid-item-image"
+                  loading="lazy"
+                />
+              </div>
+              <div className="grid-item item-5">
+                <img
+                  src="/hero-grid-5.png"
+                  alt="Water management strategy layout"
+                  className="grid-item-image"
+                  loading="lazy"
+                />
+              </div>
             </div>
           </div>
         </div>
       </section>
 
       {/* Features Section */}
-      <section id="features" className="features-section">
+      <section id="features" className="features-section" aria-labelledby="features-title">
         <div className="features-container">
           <div className="features-left">
             <div className="video-player">
@@ -83,8 +218,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
                 <div className="player-content">
                   <img 
                     src="/app-preview.svg" 
-                    alt="Coolize App Preview" 
+                    alt="Screenshot of the Coolize climate analysis interface" 
                     className="app-preview-image"
+                    loading="lazy"
                     onError={(e) => {
                       // Fallback to PNG or JPG if SVG not found
                       const target = e.target as HTMLImageElement;
@@ -101,9 +237,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
           </div>
           <div className="features-right">
             <div className="features-badge">AI ANALYSIS</div>
-            <h2 className="features-title">Climate analysis is simple.</h2>
+            <h2 id="features-title" className="features-title">Climate analysis is simple.</h2>
             <p className="features-description">
-              A climate analysis tool doesn't need hundreds of features. To achieve the desired result, it only needs three things.
+              Coolize focuses on what actually matters for urban climate analysis: clear visuals, reliable scoring, and actionable strategies you can use in real projects.
             </p>
             <div className="feature-cards">
               <div className="feature-card">
@@ -112,7 +248,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
                 </div>
                 <h3 className="feature-title">User-Friendly Interface</h3>
                 <p className="feature-text">
-                  No steep learning curves. Analyze your urban area with just a few clicks, no installation required.
+                  No steep learning curves. Analyze your urban area with a guided workflow and intuitive grid tools, directly in your browser.
                 </p>
               </div>
               <div className="feature-card">
@@ -121,7 +257,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
                 </div>
                 <h3 className="feature-title">Lightning-Fast Processing</h3>
                 <p className="feature-text">
-                  Using the latest technology for fast processing, you can get your climate score without losing any time.
+                  Powered by modern web and AI technologies, Coolize gives you climate scores and key metrics in seconds instead of hours.
                 </p>
               </div>
             </div>
@@ -130,38 +266,131 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
       </section>
 
       {/* Steps Section */}
-      <section id="how-it-works" className="steps-section">
+      <section id="how-it-works" className="steps-section" aria-labelledby="steps-title">
         <div className="steps-container">
-          <h2 className="steps-title">3 simple steps to analyze climate</h2>
+          <h2 id="steps-title" className="steps-title">3 simple steps to analyze climate</h2>
           <p className="steps-subtitle">
-            No software download or complex tutorials required. Our tools reduce climate analysis to three easy steps.
+            No software download or complex tutorials required. Coolize reduces climate analysis to three clear, repeatable steps.
           </p>
           <div className="steps-grid">
             <div className="step-card">
               <div className="step-icon">
                 <div className="icon-upload">↑</div>
               </div>
-              <h3 className="step-title">1. You Upload</h3>
+              <h3 className="step-title">1. Upload Your Project Area</h3>
               <p className="step-text">
-                Drag and drop your project image or use our grid tool. Progress will be shown until the upload is complete.
+                Drag and drop your site image or use our grid tool to define the analysis area. Progress is tracked instantly on screen.
               </p>
             </div>
             <div className="step-card">
               <div className="step-icon">
                 <div className="icon-order">⇄</div>
               </div>
-              <h3 className="step-title">2. Select Categories</h3>
+              <h3 className="step-title">2. Classify the Urban Fabric</h3>
               <p className="step-text">
-                Choose your area categories: vegetation, surfaces, and buildings to define your urban space.
+                Choose categories for vegetation, surfaces, and buildings so Coolize understands the urban layers in your project.
               </p>
             </div>
             <div className="step-card">
               <div className="step-icon">
                 <div className="icon-download">↓</div>
               </div>
-              <h3 className="step-title">3. Get Results</h3>
+              <h3 className="step-title">3. Get Your Climate Score</h3>
               <p className="step-text">
-                Simply click the Calculate button to get your comprehensive climate score and recommendations.
+                Click Calculate to get a detailed climate score with guidance on heat, green space and water strategies for your design.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing Section */}
+      <section id="pricing" className="pricing-section" aria-labelledby="pricing-title">
+        <div className="pricing-container">
+          <h2 id="pricing-title" className="pricing-title">Simple pricing for studios of any size</h2>
+          <p className="pricing-subtitle">
+            Start with a free plan for quick studies, then upgrade when you’re ready to bring Coolize into your daily workflow.
+          </p>
+          <div className="pricing-grid">
+            <div className="pricing-card">
+              <h3 className="pricing-plan-name">Starter</h3>
+              <p className="pricing-price">$0<span>/month</span></p>
+              <ul className="pricing-features">
+                <li>Up to 3 climate studies</li>
+                <li>Core climate score outputs</li>
+                <li>Export basic reports</li>
+              </ul>
+              <button className="pricing-cta">Use for Free</button>
+            </div>
+            <div className="pricing-card pricing-card-featured">
+              <h3 className="pricing-plan-name">Studio</h3>
+              <p className="pricing-price">$19<span>/month</span></p>
+              <ul className="pricing-features">
+                <li>Unlimited climate studies</li>
+                <li>Advanced score breakdowns</li>
+                <li>Export branded PDF reports</li>
+              </ul>
+              <button className="pricing-cta">Get Studio</button>
+            </div>
+            <div className="pricing-card">
+              <h3 className="pricing-plan-name">Enterprise</h3>
+              <p className="pricing-price">Let’s talk</p>
+              <ul className="pricing-features">
+                <li>Custom integrations</li>
+                <li>Team onboarding sessions</li>
+                <li>Priority support</li>
+              </ul>
+              <button className="pricing-cta">Contact Sales</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Company / About Section */}
+      <section id="company" className="company-section" aria-labelledby="company-title">
+        <div className="company-container">
+          <h2 id="company-title" className="company-title">Designed for urban climate professionals</h2>
+          <p className="company-subtitle">
+            Coolize is built for architects, urban designers and climate consultants who need fast, visual climate insights during design.
+          </p>
+          <div className="company-grid">
+            <div className="company-card">
+              <h3 className="company-card-title">Our mission</h3>
+              <p className="company-card-text">
+                Make professional urban climate analysis accessible to every project team, not just specialized research groups.
+              </p>
+            </div>
+            <div className="company-card">
+              <h3 className="company-card-title">How we work</h3>
+              <p className="company-card-text">
+                We partner with practitioners, test on real city projects, and prioritize clear, explainable outputs over black-box scores.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ / Support Section */}
+      <section id="faq" className="faq-section" aria-labelledby="faq-title">
+        <div className="faq-container">
+          <h2 id="faq-title" className="faq-title">Frequently asked questions</h2>
+          <div className="faq-grid">
+            <div className="faq-item">
+              <h3 className="faq-question">What kind of input do I need?</h3>
+              <p className="faq-answer">
+                You can start with a simple top-view project image or diagram. The grid tool helps you translate it into analyzable climate categories.
+              </p>
+            </div>
+            <div className="faq-item">
+              <h3 className="faq-question">Is Coolize a replacement for full simulation tools?</h3>
+              <p className="faq-answer">
+                Coolize focuses on fast, early-phase guidance. It complements, rather than replaces, detailed CFD or energy simulations.
+              </p>
+            </div>
+            <div className="faq-item">
+              <h3 className="faq-question">How accurate are the climate scores?</h3>
+              <p className="faq-answer">
+                Scores are based on transparent rules about vegetation, surface and building ratios. They are optimized for comparability between design options.
               </p>
             </div>
           </div>
@@ -169,19 +398,28 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
       </section>
 
       {/* Related Tools Section */}
-      <section className="related-tools-section">
+      <section
+        className="related-tools-section"
+        aria-labelledby="related-tools-title"
+        role="region"
+      >
         <div className="related-tools-container">
-          <h2 className="related-tools-title">Related Tools</h2>
+          <h2 id="related-tools-title" className="related-tools-title">Related Tools</h2>
           <div className="tools-carousel-wrapper">
             <button 
               className="carousel-nav-btn carousel-nav-left" 
-              aria-label="Previous"
+              aria-label="Previous related tools"
               onClick={() => scrollCarousel('left')}
             >
               <span>‹</span>
             </button>
-            <div className="tools-carousel" ref={carouselRef}>
-              <div className="tool-card tool-card-1">
+            <div
+              className="tools-carousel"
+              ref={carouselRef}
+              role="list"
+              aria-label="Related tools carousel"
+            >
+              <div className="tool-card tool-card-1" role="listitem">
                 <div className="tool-badge">Popular</div>
                 <div className="tool-content">
                   <h3 className="tool-title">Urban Heat Island Analyzer</h3>
@@ -190,7 +428,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
                   </p>
                 </div>
               </div>
-              <div className="tool-card tool-card-2">
+              <div className="tool-card tool-card-2" role="listitem">
                 <div className="tool-badge">Popular</div>
                 <div className="tool-content">
                   <h3 className="tool-title">Green Space Optimizer</h3>
@@ -199,7 +437,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
                   </p>
                 </div>
               </div>
-              <div className="tool-card tool-card-3">
+              <div className="tool-card tool-card-3" role="listitem">
                 <div className="tool-badge">New</div>
                 <div className="tool-content">
                   <h3 className="tool-title">Water Management Planner</h3>
@@ -211,7 +449,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
             </div>
             <button 
               className="carousel-nav-btn carousel-nav-right" 
-              aria-label="Next"
+              aria-label="Next related tools"
               onClick={() => scrollCarousel('right')}
             >
               <span>›</span>
@@ -220,10 +458,10 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
         </div>
       </section>
 
-      {/* Related Articles Section */}
-      <section className="articles-section">
+      {/* Blog / Articles Section */}
+      <section id="blog" className="articles-section" aria-labelledby="articles-title">
         <div className="articles-container">
-          <h2 className="articles-title">Related Articles</h2>
+          <h2 id="articles-title" className="articles-title">From the Coolize climate guide</h2>
           <div className="articles-scroll">
             <div className="article-card">Urban Heat Island Effect</div>
             <div className="article-card">Green Infrastructure Benefits</div>
@@ -235,7 +473,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
       </section>
 
       {/* Footer */}
-      <footer className="landing-footer">
+      <footer className="landing-footer" aria-label="Coolize site footer">
         <div className="footer-container">
           <div className="footer-top">
             <div className="footer-brand">
@@ -312,6 +550,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
           </div>
         </div>
       </footer>
+      </main>
     </div>
   );
 };

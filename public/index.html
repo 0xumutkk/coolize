@@ -7,14 +7,117 @@
     <meta name="theme-color" content="#000000" />
     <meta
       name="description"
-      content="Web site created using create-react-app"
+      content="Coolize is an AI-powered tool that analyzes urban areas and provides clear climate scores and strategies to improve heat, green space and water management."
+    />
+    <meta
+      name="keywords"
+      content="Coolize, climate analysis, urban climate, urban heat island, green space analysis, water management, AI climate tool"
     />
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
+    <link rel="canonical" href="https://coolize.app/" />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://coolize.app/" />
+    <meta
+      property="og:title"
+      content="Coolize – AI-Powered Urban Climate Analysis"
+    />
+    <meta
+      property="og:description"
+      content="Analyze your city's climate performance in minutes. Coolize turns complex climate data into clear scores and actionable strategies."
+    />
+    <meta property="og:image" content="https://coolize.app/app-preview.png" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="https://coolize.app/" />
+    <meta
+      name="twitter:title"
+      content="Coolize – AI-Powered Urban Climate Analysis"
+    />
+    <meta
+      name="twitter:description"
+      content="AI-powered climate analysis for urban areas with clear scores and strategies."
+    />
+    <meta name="twitter:image" content="https://coolize.app/app-preview.png" />
+
     <!--
       manifest.json provides metadata used when your web app is installed on a
       user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
     -->
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+
+    <!-- Structured Data: SoftwareApplication & Organization -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Coolize",
+        "url": "https://coolize.app/",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Web",
+        "description": "Coolize analyzes urban climate conditions and provides climate scores and strategies for heat, vegetation and water management.",
+        "image": "https://coolize.app/app-preview.png",
+        "publisher": {
+          "@type": "Organization",
+          "name": "Coolize Studio, Inc.",
+          "url": "https://coolize.app/"
+        },
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        }
+      }
+    </script>
+
+    <!-- Structured Data: Breadcrumbs -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "Home",
+            "item": "https://coolize.app/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "Product",
+            "item": "https://coolize.app/#features"
+          },
+          {
+            "@type": "ListItem",
+            "position": 3,
+            "name": "How It Works",
+            "item": "https://coolize.app/#how-it-works"
+          },
+          {
+            "@type": "ListItem",
+            "position": 4,
+            "name": "Pricing",
+            "item": "https://coolize.app/#pricing"
+          },
+          {
+            "@type": "ListItem",
+            "position": 5,
+            "name": "Company",
+            "item": "https://coolize.app/#company"
+          },
+          {
+            "@type": "ListItem",
+            "position": 6,
+            "name": "Blog",
+            "item": "https://coolize.app/#blog"
+          }
+        ]
+      }
+    </script>
+
     <!--
       Notice the use of %PUBLIC_URL% in the tags above.
       It will be replaced with the URL of the `public` folder during the build.
@@ -24,7 +127,7 @@
       work correctly both with client-side routing and a non-root public URL.
       Learn how to configure a non-root public URL by running `npm run build`.
     -->
-    <title>Coolize - Climate Guide</title>
+    <title>Coolize – AI-Powered Urban Climate Analysis</title>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>

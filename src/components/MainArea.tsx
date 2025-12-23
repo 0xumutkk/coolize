@@ -17,6 +17,7 @@ interface CanvasAreaProps {
   paintAt: (x: number, y: number) => void;
   drawGridAndCells: () => void;
   gridSize: number;
+  locationInfo?: string;
 }
 
 const CanvasArea: React.FC<CanvasAreaProps> = ({
@@ -29,6 +30,7 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({
   paintAt,
   drawGridAndCells,
   gridSize,
+  locationInfo,
 }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const fullscreenContainerRef = useRef<HTMLDivElement>(null);
@@ -238,7 +240,7 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({
 
   return (
     <div id="canvasWrapper" ref={fullscreenContainerRef}>
-      <CanvasNavbar />
+      <CanvasNavbar locationInfo={locationInfo} />
       <div id="canvasWithRulers">
         {renderRuler('horizontal')}
         <div id="canvasRulerContainer">
@@ -459,6 +461,7 @@ interface MainAreaProps {
   paintAt: (x: number, y: number) => void;
   updateStatsAndScores: () => { percents: { [key in GridClass]: number; }; scores: ScoreData; };
   drawGridAndCells: () => void; // useGrid'den geliyor
+  locationInfo?: string;
 }
 
 const MainArea: React.FC<MainAreaProps> = ({
@@ -473,6 +476,7 @@ const MainArea: React.FC<MainAreaProps> = ({
   paintAt,
   updateStatsAndScores,
   drawGridAndCells,
+  locationInfo,
 }) => {
   const [statsAndScores, setStatsAndScores] = useState<{ percents: { [key in GridClass]: number }; scores: ScoreData }>(() => updateStatsAndScores());
   const [isCalculated, setIsCalculated] = useState(false);
@@ -519,6 +523,7 @@ const MainArea: React.FC<MainAreaProps> = ({
           paintAt={paintAt}
           drawGridAndCells={drawGridAndCells}
           gridSize={gridSize}
+          locationInfo={locationInfo}
         />
         <PercentsPanel 
           percents={statsAndScores.percents}

@@ -1,13 +1,38 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './App.css';
+import 'leaflet/dist/leaflet.css';
 import LandingPage from './components/LandingPage';
 import Sidebar from './components/Sidebar';
 import MainArea from './components/MainArea';
 import TopNavbar from './components/TopNavbar';
 import { useGrid } from './hooks/useGrid';
 
+type SelectedLocation = {
+  name: string;
+  lat: number;
+  lon: number;
+} | null;
+
 function App() {
   const [showApp, setShowApp] = useState(false);
+  const [selectedLocation, setSelectedLocation] = useState<SelectedLocation>(null);
+
+  useEffect(() => {
+    // Set initial body class
+    if (!showApp) {
+      document.body.classList.add('landing-active');
+    } else {
+      document.body.classList.remove('landing-active');
+    }
+  }, [showApp]);
+
+  useEffect(() => {
+    // Set initial class on mount
+    document.body.classList.add('landing-active');
+    return () => {
+      document.body.classList.remove('landing-active');
+    };
+  }, []);
   const {
     gridSize,
     setGridSize,
@@ -53,6 +78,8 @@ function App() {
           currentClass={currentClass}
           setCurrentClass={setCurrentClass}
           setBaseImageSrc={setBaseImageSrc}
+          onLocationSelect={setSelectedLocation}
+          selectedLocation={selectedLocation}
         />
         <MainArea
           gridSize={gridSize}
@@ -66,6 +93,11 @@ function App() {
           paintAt={paintAt}
           updateStatsAndScores={updateStatsAndScores}
           drawGridAndCells={drawGridAndCells}
+          locationInfo={
+            selectedLocation
+              ? `${selectedLocation.name} (${selectedLocation.lat.toFixed(3)}, ${selectedLocation.lon.toFixed(3)})`
+              : 'No location set'
+          }
         />
       </div>
     </div>

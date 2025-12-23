@@ -1,5 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { CLASS_CONFIG } from '../utils/constants';
+import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
+import L from 'leaflet';
 
 interface SidebarProps {
   gridSize: number;
@@ -7,6 +9,8 @@ interface SidebarProps {
   currentClass: keyof typeof CLASS_CONFIG;
   setCurrentClass: (cls: keyof typeof CLASS_CONFIG) => void;
   setBaseImageSrc: (src: string | null) => void;
+  onLocationSelect?: (loc: { name: string; lat: number; lon: number }) => void;
+  selectedLocation?: { name: string; lat: number; lon: number } | null;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -15,6 +19,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   currentClass,
   setCurrentClass,
   setBaseImageSrc,
+  onLocationSelect,
+  selectedLocation,
 }) => {
   const [openCategories, setOpenCategories] = useState<{ [key: string]: boolean }>({
     vegetation: false,
@@ -22,7 +28,36 @@ const Sidebar: React.FC<SidebarProps> = ({
     building: false,
   });
   const [locationSearch, setLocationSearch] = useState<string>('');
-  const [mapMarker, setMapMarker] = useState<{ x: number; y: number } | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const [selectedLocationName, setSelectedLocationName] = useState<string | null>(null);
+
+  const defaultCenter: [number, number] = [41.015137, 28.97953]; // Istanbul by default
+
+  // Loosen typings for react-leaflet components to avoid TS prop incompatibilities
+  const RLMapContainer: any = MapContainer as any;
+  const RLTileLayer: any = TileLayer as any;
+  const RLMarker: any = Marker as any;
+
+  const markerIcon = useMemo(
+    () =>
+      L.icon({
+        iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+        iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+        shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+      }),
+    []
+  );
+
+  const MapClickHandler: React.FC<{ onMapClick: (lat: number, lon: number) => void }> = ({ onMapClick }) => {
+    useMapEvents({
+      click(e: any) {
+        onMapClick(e.latlng.lat, e.latlng.lng);
+      },
+    });
+    return null;
+  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -53,21 +88,64 @@ const Sidebar: React.FC<SidebarProps> = ({
     setLocationSearch(e.target.value);
   };
 
-  const handleLocationSearchSubmit = (e: React.FormEvent) => {
+  const updateSelectedLocation = (lat: number, lon: number, source: 'search' | 'click' | 'drag') => {
+    const baseName =
+      selectedLocationName ||
+      selectedLocation?.name ||
+      locationSearch.trim() ||
+      'Custom point';
+
+    // Şimdilik text bilgisini değiştirmeden, sadece koordinatları güncelliyoruz
+    const name = baseName;
+
+    setSelectedLocationName(name);
+    onLocationSelect?.({ name, lat, lon });
+  };
+
+  const handleLocationSearchSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (locationSearch.trim()) {
-      // Mock-up: Random position for marker
-      const randomX = Math.random() * 80 + 10; // 10-90%
-      const randomY = Math.random() * 80 + 10; // 10-90%
-      setMapMarker({ x: randomX, y: randomY });
+    if (!locationSearch.trim()) return;
+
+    try {
+      setIsSearching(true);
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+        locationSearch.trim()
+      )}&limit=1`;
+
+      const res = await fetch(url, {
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'coolize-app/1.0 (contact@coolize.app)',
+        },
+      });
+
+      if (!res.ok) {
+        throw new Error('Location search failed');
+      }
+
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        const first = data[0];
+        const lat = parseFloat(first.lat);
+        const lon = parseFloat(first.lon);
+        const name: string = first.display_name || locationSearch.trim();
+
+        setSelectedLocationName(name);
+        // search sonucunda gelen noktayı merkez/başlangıç kabul et
+        onLocationSelect?.({ name, lat, lon });
+      } else {
+        alert('Location not found. Please try another search.');
+      }
+    } catch (error) {
+      console.error(error);
+      alert('There was a problem searching for this location.');
+    } finally {
+      setIsSearching(false);
     }
   };
 
-  const handleMapClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * 100;
-    const y = ((e.clientY - rect.top) / rect.height) * 100;
-    setMapMarker({ x, y });
+  const handleMapClick = (lat: number, lon: number) => {
+    updateSelectedLocation(lat, lon, 'click');
   };
 
   // Mock-up categories with options
@@ -242,6 +320,11 @@ const Sidebar: React.FC<SidebarProps> = ({
           <span className="section-number">4</span>
           <h2>Location</h2>
         </div>
+        {selectedLocationName && (
+          <p className="instruction-text">
+            Selected: {selectedLocationName}
+          </p>
+        )}
         <form onSubmit={handleLocationSearchSubmit} className="location-search-form">
           <div className="location-search-wrapper">
             <input
@@ -252,34 +335,47 @@ const Sidebar: React.FC<SidebarProps> = ({
               onChange={handleLocationSearch}
             />
             <button type="submit" className="location-search-btn">
-              🔍
+              {isSearching ? '...' : '🔍'}
             </button>
           </div>
         </form>
-        <div className="map-container" onClick={handleMapClick}>
-          <div className="map-mockup">
-            <div className="map-grid">
-              {Array.from({ length: 12 }).map((_, i) => (
-                <div key={i} className="map-grid-line"></div>
-              ))}
-            </div>
-            {mapMarker && (
-              <div
-                className="map-marker"
-                style={{
-                  left: `${mapMarker.x}%`,
-                  top: `${mapMarker.y}%`,
-                }}
-              >
-              </div>
+        <div className="map-container">
+          <RLMapContainer
+            key={
+              selectedLocation
+                ? `${selectedLocation.lat.toFixed(4)},${selectedLocation.lon.toFixed(4)}`
+                : 'default'
+            }
+            center={
+              selectedLocation
+                ? [selectedLocation.lat, selectedLocation.lon]
+                : defaultCenter
+            }
+            zoom={13}
+            style={{ width: '100%', height: '100%' }}
+            scrollWheelZoom={false}
+          >
+            <RLTileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+            {selectedLocation && (
+              <>
+                <RLMarker
+                  position={[selectedLocation.lat, selectedLocation.lon]}
+                  icon={markerIcon}
+                  draggable
+                  eventHandlers={{
+                    dragend: (e: any) => {
+                      const newPos = e.target.getLatLng();
+                      updateSelectedLocation(newPos.lat, newPos.lng, 'drag');
+                    },
+                  }}
+                />
+              </>
             )}
-            {!mapMarker && (
-              <div className="map-placeholder">
-                <span className="map-placeholder-icon"></span>
-                <span className="map-placeholder-text">Click to set location</span>
-              </div>
-            )}
-          </div>
+            <MapClickHandler onMapClick={handleMapClick} />
+          </RLMapContainer>
         </div>
       </div>
     </aside>
