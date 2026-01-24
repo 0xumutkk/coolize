@@ -248,7 +248,7 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({
           <div id="canvasContainer" ref={containerRef}>
             <img
               id="baseImage"
-              alt="Image not loaded yet"
+              alt="Base map not loaded yet"
               ref={baseImageRef}
               src={baseImageSrc || undefined}
               style={{ display: baseImageSrc ? 'block' : 'none' }}

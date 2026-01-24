@@ -160,7 +160,6 @@ export const useGrid = () => {
     const canopyPercent = pAgacH + pAgacY;
     const greenPercent = canopyPercent + pCim + pToprak + pGecirgen;
     const waterPercent = pSu;
-    const permeablePercent = pCim + pToprak + pGecirgen + canopyPercent;
     const asphaltPercent = pAsfalt;
     const concretePercent = pBeton;
     const sealedPercent = pAsfalt + pBeton + pBina;
