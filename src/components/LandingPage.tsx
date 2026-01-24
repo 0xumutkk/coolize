@@ -147,11 +147,10 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
       <section id="hero" className="hero-section" aria-labelledby="hero-title">
         <div className="hero-container">
           <div className="hero-left">
-            <div className="hero-badge">#1 ONLINE CLIMATE ANALYSIS TOOL</div>
-            <h1 id="hero-title" className="hero-title">Climate Score Analysis</h1>
+            <div className="hero-badge">nature based solution</div>
+            <h1 id="hero-title" className="hero-title">Microclimate Adaptation</h1>
             <p className="hero-description">
-              Turn complex climate assessments into a clear, visual climate score. Upload your urban area once, and let our AI handle the heavy analysis for you.
-            </p>
+            Urban spaces are modeled using a layered, pixel-based approach to generate AI-driven microclimate scores; outdoor areas are analyzed through microclimate profiling, and nature-based strategies are proposed to mitigate the urban heat island effect and improve microclimatic performance.            </p>
             <button className="hero-cta" onClick={onEnterApp}>Get Started</button>
             <div className="scroll-hint">
               Scroll to see how Coolize works ↓
@@ -161,7 +160,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
             <div className="hero-image-grid">
               <div className="grid-item item-1">
                 <img
-                  src="/hero-grid-1.png"
+                  src="https://images.unsplash.com/photo-1480714378408-67cf0d13bc1b?w=800&h=600&fit=crop"
                   alt="Urban climate analysis overview"
                   className="grid-item-image"
                   loading="lazy"
@@ -169,7 +168,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
               </div>
               <div className="grid-item item-2">
                 <img
-                  src="/hero-grid-2.png"
+                  src="https://images.unsplash.com/photo-1524661135-423995f22d0b?w=800&h=600&fit=crop"
                   alt="Project area heat map preview"
                   className="grid-item-image"
                   loading="lazy"
@@ -177,7 +176,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
               </div>
               <div className="grid-item item-3">
                 <img
-                  src="/hero-grid-3.png"
+                  src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&h=600&fit=crop"
                   alt="Climate score breakdown card"
                   className="grid-item-image"
                   loading="lazy"
@@ -185,7 +184,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
               </div>
               <div className="grid-item item-4">
                 <img
-                  src="/hero-grid-4.png"
+                  src="https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=800&h=600&fit=crop"
                   alt="Green space optimization diagram"
                   className="grid-item-image"
                   loading="lazy"
@@ -193,7 +192,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
               </div>
               <div className="grid-item item-5">
                 <img
-                  src="/hero-grid-5.png"
+                  src="https://images.unsplash.com/photo-1581092160562-40aa08e78837?w=800&h=600&fit=crop"
                   alt="Water management strategy layout"
                   className="grid-item-image"
                   loading="lazy"
@@ -237,28 +236,46 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
           </div>
           <div className="features-right">
             <div className="features-badge">AI ANALYSIS</div>
-            <h2 id="features-title" className="features-title">Climate analysis is simple.</h2>
+            <h2 id="features-title" className="features-title">Turning Urban Climate Data into Real Decisions</h2>
             <p className="features-description">
               Coolize focuses on what actually matters for urban climate analysis: clear visuals, reliable scoring, and actionable strategies you can use in real projects.
             </p>
             <div className="feature-cards">
               <div className="feature-card">
                 <div className="feature-icon">
-                  <div className="icon-square"></div>
+                  <div className="icon-design">🎨</div>
                 </div>
-                <h3 className="feature-title">User-Friendly Interface</h3>
-                <p className="feature-text">
-                  No steep learning curves. Analyze your urban area with a guided workflow and intuitive grid tools, directly in your browser.
-                </p>
+                <div className="feature-content">
+                  <h3 className="feature-title">1. Design-Focused</h3>
+                  <p className="feature-text">
+                    Technical data → design input<br/>
+                    Not just numbers, but interpretable results
+                  </p>
+                </div>
               </div>
               <div className="feature-card">
                 <div className="feature-icon">
                   <div className="icon-lightning">⚡</div>
                 </div>
-                <h3 className="feature-title">Lightning-Fast Processing</h3>
-                <p className="feature-text">
-                  Powered by modern web and AI technologies, Coolize gives you climate scores and key metrics in seconds instead of hours.
-                </p>
+                <div className="feature-content">
+                  <h3 className="feature-title">2. Fast and Lightweight</h3>
+                  <p className="feature-text">
+                    Alternative to hour-long simulations<br/>
+                    In browser, instantly
+                  </p>
+                </div>
+              </div>
+              <div className="feature-card">
+                <div className="feature-icon">
+                  <div className="icon-project">🏗️</div>
+                </div>
+                <div className="feature-content">
+                  <h3 className="feature-title">3. Real Project Ready</h3>
+                  <p className="feature-text">
+                    Competitions, preliminary projects, masterplans<br/>
+                    Suitable for municipal and public scale
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -268,30 +285,39 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
       {/* Steps Section */}
       <section id="how-it-works" className="steps-section" aria-labelledby="steps-title">
         <div className="steps-container">
-          <h2 id="steps-title" className="steps-title">3 simple steps to analyze climate</h2>
+          <h2 id="steps-title" className="steps-title">Microclimate strategies in 3 steps</h2>
           <p className="steps-subtitle">
             No software download or complex tutorials required. Coolize reduces climate analysis to three clear, repeatable steps.
           </p>
           <div className="steps-grid">
             <div className="step-card">
+              <div className="step-image">
+                {/* Image will be added here */}
+              </div>
               <div className="step-icon">
                 <div className="icon-upload">↑</div>
               </div>
-              <h3 className="step-title">1. Upload Your Project Area</h3>
+              <h3 className="step-title">1. Upload or Select Your Project Area</h3>
               <p className="step-text">
-                Drag and drop your site image or use our grid tool to define the analysis area. Progress is tracked instantly on screen.
+                Drag and drop your site image, select your work area from the map, or use our grid tool to define the analysis area. Progress is tracked instantly on screen.
               </p>
             </div>
             <div className="step-card">
+              <div className="step-image">
+                {/* Image will be added here */}
+              </div>
               <div className="step-icon">
                 <div className="icon-order">⇄</div>
               </div>
-              <h3 className="step-title">2. Classify the Urban Fabric</h3>
+              <h3 className="step-title">2. AI Analysis & Strategy Development</h3>
               <p className="step-text">
-                Choose categories for vegetation, surfaces, and buildings so Coolize understands the urban layers in your project.
+                AI recognizes and analyzes these surfaces to calculate microclimate scores and develop tailored strategies.
               </p>
             </div>
             <div className="step-card">
+              <div className="step-image">
+                {/* Image will be added here */}
+              </div>
               <div className="step-icon">
                 <div className="icon-download">↓</div>
               </div>
