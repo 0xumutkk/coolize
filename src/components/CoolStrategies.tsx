@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 interface CoolStrategiesProps {
   scores: {
@@ -9,9 +9,68 @@ interface CoolStrategiesProps {
     BCI: number;
     UCIS: number;
   };
+  locationData?: {
+    name?: string;
+    lat?: number;
+    lon?: number;
+  };
 }
 
-const CoolStrategies: React.FC<CoolStrategiesProps> = ({ scores }) => {
+interface AIRecommendations {
+  visualAnalysis?: {
+    strength: string;
+    weakness: string;
+    opportunity: string;
+  };
+  strategy?: {
+    title: string;
+    category: string;
+    description: string;
+    impact: string;
+  };
+  recommendation?: {
+    title: string;
+    description: string;
+  };
+}
+
+const CoolStrategies: React.FC<CoolStrategiesProps> = ({ scores, locationData }) => {
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [aiRecommendations, setAIRecommendations] = useState<AIRecommendations | null>(null);
+
+  const handleAIAnalyze = async () => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch('http://localhost:3001/api/analyze', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          locationData: {
+            ...locationData,
+            scores: scores
+          }
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Analiz sırasında bir hata oluştu.');
+      }
+
+      setAIRecommendations(data.recommendations);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Bilinmeyen bir hata oluştu.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const strategies = [
     {
       category: 'Nature Integration',
@@ -71,7 +130,26 @@ const CoolStrategies: React.FC<CoolStrategiesProps> = ({ scores }) => {
   return (
     <div id="coolStrategiesPanel">
       <h3>Cool Strategies</h3>
-      
+
+      {/* AI Analysis Button */}
+      <div className="ai-button-container">
+        <button
+          className="ai-analyze-button"
+          onClick={handleAIAnalyze}
+          disabled={isLoading}
+        >
+          {isLoading ? (
+            <>
+              <span className="loading-spinner"></span>
+              AI Analiz Ediliyor...
+            </>
+          ) : (
+            '🤖 AI ile Analiz Et'
+          )}
+        </button>
+        {error && <div className="ai-error">⚠️ {error}</div>}
+      </div>
+
       {/* Visual Analysis Section */}
       <div className="strategies-section">
         <h4 className="section-title">Visual Analysis</h4>
@@ -84,9 +162,15 @@ const CoolStrategies: React.FC<CoolStrategiesProps> = ({ scores }) => {
               {visualAnalysis.strengths.map((item, index) => (
                 <li key={index}>{item}</li>
               ))}
+              {aiRecommendations?.visualAnalysis?.strength && (
+                <li className="ai-generated-item">
+                  <span className="ai-badge">🤖 AI</span>
+                  {aiRecommendations.visualAnalysis.strength}
+                </li>
+              )}
             </ul>
           </div>
-          
+
           <div className="analysis-card weaknesses">
             <div className="analysis-header">
               <h5>Weaknesses</h5>
@@ -95,9 +179,15 @@ const CoolStrategies: React.FC<CoolStrategiesProps> = ({ scores }) => {
               {visualAnalysis.weaknesses.map((item, index) => (
                 <li key={index}>{item}</li>
               ))}
+              {aiRecommendations?.visualAnalysis?.weakness && (
+                <li className="ai-generated-item">
+                  <span className="ai-badge">🤖 AI</span>
+                  {aiRecommendations.visualAnalysis.weakness}
+                </li>
+              )}
             </ul>
           </div>
-          
+
           <div className="analysis-card opportunities">
             <div className="analysis-header">
               <h5>Opportunities</h5>
@@ -106,6 +196,12 @@ const CoolStrategies: React.FC<CoolStrategiesProps> = ({ scores }) => {
               {visualAnalysis.opportunities.map((item, index) => (
                 <li key={index}>{item}</li>
               ))}
+              {aiRecommendations?.visualAnalysis?.opportunity && (
+                <li className="ai-generated-item">
+                  <span className="ai-badge">🤖 AI</span>
+                  {aiRecommendations.visualAnalysis.opportunity}
+                </li>
+              )}
             </ul>
           </div>
         </div>
@@ -133,6 +229,27 @@ const CoolStrategies: React.FC<CoolStrategiesProps> = ({ scores }) => {
               </div>
             </div>
           ))}
+
+          {/* AI Generated Strategy */}
+          {aiRecommendations?.strategy && (
+            <div className="strategy-card ai-generated-card">
+              <div className="strategy-header">
+                <div className="strategy-title-group">
+                  <h5 className="strategy-title">
+                    <span className="ai-badge">🤖 AI</span>
+                    {aiRecommendations.strategy.title}
+                  </h5>
+                  <span className="strategy-priority high">AI Önerisi</span>
+                </div>
+              </div>
+              <p className="strategy-category">{aiRecommendations.strategy.category}</p>
+              <p className="strategy-description">{aiRecommendations.strategy.description}</p>
+              <div className="strategy-impact">
+                <span className="impact-label">Beklenen Etki:</span>
+                <span className="impact-value">{aiRecommendations.strategy.impact}</span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -161,6 +278,20 @@ const CoolStrategies: React.FC<CoolStrategiesProps> = ({ scores }) => {
               <p>Develop comprehensive master plan integrating all strategies, establish monitoring systems, and create sustainable maintenance protocols.</p>
             </div>
           </div>
+
+          {/* AI Generated Recommendation */}
+          {aiRecommendations?.recommendation && (
+            <div className="recommendation-item ai-generated-card">
+              <span className="rec-number ai-rec-number">🤖</span>
+              <div className="rec-content">
+                <h5>
+                  <span className="ai-badge">AI</span>
+                  {aiRecommendations.recommendation.title}
+                </h5>
+                <p>{aiRecommendations.recommendation.description}</p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -168,4 +299,3 @@ const CoolStrategies: React.FC<CoolStrategiesProps> = ({ scores }) => {
 };
 
 export default CoolStrategies;
-
