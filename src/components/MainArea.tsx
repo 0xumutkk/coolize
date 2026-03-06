@@ -3,6 +3,7 @@ import { CLASS_CONFIG } from '../utils/constants';
 import Speedometer from './Speedometer';
 import CanvasNavbar from './CanvasNavbar';
 import CoolStrategies from './CoolStrategies';
+import SaaSProducts from './SaaSProducts';
 
 type GridClass = keyof typeof CLASS_CONFIG;
 type GridArray = GridClass[][];
@@ -49,7 +50,7 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({
       const containerRect = containerRef.current.getBoundingClientRect();
       const containerWidth = Math.round(containerRect.width);
       const containerHeight = Math.round(containerRect.height);
-      
+
       // Set grid canvas size to match container
       if (gridCanvasRef.current.width !== containerWidth || gridCanvasRef.current.height !== containerHeight) {
         gridCanvasRef.current.width = containerWidth;
@@ -57,7 +58,7 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({
         gridCanvasRef.current.style.width = containerWidth + 'px';
         gridCanvasRef.current.style.height = containerHeight + 'px';
       }
-      
+
       // If no image, setup fallback canvas
       if (!baseImageSrc && fallbackCanvasRef.current) {
         if (fallbackCanvasRef.current.width !== containerWidth || fallbackCanvasRef.current.height !== containerHeight) {
@@ -71,7 +72,7 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({
         }
         fallbackCanvasRef.current.style.display = 'block';
       }
-      
+
       drawGridAndCells();
     }
   }, [baseImageSrc, baseImageRef, fallbackCanvasRef, gridCanvasRef, drawGridAndCells]);
@@ -188,19 +189,19 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({
 
   const renderRuler = (orientation: 'horizontal' | 'vertical') => {
     if (rulerSize.width === 0 || rulerSize.height === 0) return null;
-    
+
     const isHorizontal = orientation === 'horizontal';
     const length = isHorizontal ? rulerSize.width : rulerSize.height;
     const rulerSize_px = 24;
-    
+
     // Calculate tick interval based on grid size
     const cellsPerTick = Math.max(1, Math.floor(gridSize / 20));
     const cellSize = length / gridSize;
     const tickInterval = cellSize * cellsPerTick;
-    
+
     const ticks = [];
     const majorTickInterval = tickInterval * 5;
-    
+
     for (let i = 0; i <= length; i += tickInterval) {
       const isMajorTick = Math.abs(i % majorTickInterval) < tickInterval / 2 || i === 0 || i >= length - tickInterval / 2;
       const cellIndex = Math.round((i / length) * gridSize);
@@ -212,7 +213,7 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({
     }
 
     return (
-      <div 
+      <div
         className={`ruler ${orientation}`}
         style={{
           width: isHorizontal ? length : rulerSize_px,
@@ -339,6 +340,23 @@ interface ScoresPanelProps {
 
 const ScoresPanel: React.FC<ScoresPanelProps> = ({ scores, isSummarizeOpen, onSummarizeToggle }) => {
 
+  const visualAnalysis = {
+    strengths: [
+      'Strong water management infrastructure',
+      'Good distribution of green spaces',
+      'Effective use of permeable materials'
+    ],
+    weaknesses: [
+      'Limited canopy coverage in central areas',
+      'High concentration of sealed surfaces',
+      'Insufficient shade in pedestrian zones'
+    ],
+    opportunities: [
+      'Potential for rooftop gardens',
+      'Space available for additional tree planting',
+      'Opportunity to retrofit existing buildings'
+    ]
+  };
 
   const getScoreLabel = (key: string) => {
     const labels: { [key: string]: string } = {
@@ -364,7 +382,7 @@ const ScoresPanel: React.FC<ScoresPanelProps> = ({ scores, isSummarizeOpen, onSu
   return (
     <div id="scoresPanel">
       <h3>Score Results</h3>
-      
+
       {/* UCIS Speedometer */}
       <div id="ucisSpeedometer">
         <div className="speedometer-container">
@@ -382,7 +400,7 @@ const ScoresPanel: React.FC<ScoresPanelProps> = ({ scores, isSummarizeOpen, onSu
           <div key={item.key} className="index-score-row-compact">
             <span className="index-key-compact">{item.key}</span>
             <div className="index-bar-container-compact">
-              <div 
+              <div
                 className="index-bar-compact"
                 style={{ width: `${item.value}%` }}
               ></div>
@@ -394,7 +412,7 @@ const ScoresPanel: React.FC<ScoresPanelProps> = ({ scores, isSummarizeOpen, onSu
 
       {/* Summarize Section */}
       <div id="summarizeWrapper">
-        <button 
+        <button
           id="summarizeToggleBtn"
           onClick={onSummarizeToggle}
           className={isSummarizeOpen ? 'open' : ''}
@@ -410,11 +428,48 @@ const ScoresPanel: React.FC<ScoresPanelProps> = ({ scores, isSummarizeOpen, onSu
           </div>
         )}
       </div>
+
+      {/* Visual Analysis Section */}
+      <div className="strategies-section" style={{ marginTop: '24px' }}>
+        <h4 className="section-title">Visual Analysis</h4>
+        <div className="analysis-grid">
+          <div className="analysis-card strengths">
+            <div className="analysis-header">
+              <h5>Strengths</h5>
+            </div>
+            <ul className="analysis-list">
+              {visualAnalysis.strengths.map((item, index) => (
+                <li key={index}>{item}</li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="analysis-card weaknesses">
+            <div className="analysis-header">
+              <h5>Weaknesses</h5>
+            </div>
+            <ul className="analysis-list">
+              {visualAnalysis.weaknesses.map((item, index) => (
+                <li key={index}>{item}</li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="analysis-card opportunities">
+            <div className="analysis-header">
+              <h5>Opportunities</h5>
+            </div>
+            <ul className="analysis-list">
+              {visualAnalysis.opportunities.map((item, index) => (
+                <li key={index}>{item}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
-
-
 const generateSummary = (ucisScore: number, indexScores: Array<{ key: string; value: number; label: string }>) => {
   const getScoreLevel = (score: number) => {
     if (score >= 80) return { level: 'excellent', emoji: '', color: '#22c55e' };
@@ -425,7 +480,7 @@ const generateSummary = (ucisScore: number, indexScores: Array<{ key: string; va
 
   const ucisLevel = getScoreLevel(ucisScore);
   const avgIndex = indexScores.reduce((sum, item) => sum + item.value, 0) / indexScores.length;
-  
+
   const strongestIndex = indexScores.reduce((max, item) => item.value > max.value ? item : max, indexScores[0]);
   const weakestIndex = indexScores.reduce((min, item) => item.value < min.value ? item : min, indexScores[0]);
 
@@ -447,7 +502,6 @@ const generateSummary = (ucisScore: number, indexScores: Array<{ key: string; va
     </div>
   );
 };
-
 
 interface MainAreaProps {
   gridSize: number;
@@ -525,7 +579,7 @@ const MainArea: React.FC<MainAreaProps> = ({
           gridSize={gridSize}
           locationInfo={locationInfo}
         />
-        <PercentsPanel 
+        <PercentsPanel
           percents={statsAndScores.percents}
           calculateButton={
             <div className="calculate-btn-wrapper">
@@ -544,11 +598,12 @@ const MainArea: React.FC<MainAreaProps> = ({
           }
         />
       </div>
-      <ScoresPanel 
+      <ScoresPanel
         scores={statsAndScores.scores}
         isSummarizeOpen={isSummarizeOpen}
         onSummarizeToggle={() => setIsSummarizeOpen(!isSummarizeOpen)}
       />
+      <SaaSProducts scores={statsAndScores.scores} />
       <CoolStrategies scores={statsAndScores.scores} />
     </main>
   );

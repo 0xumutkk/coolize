@@ -30,29 +30,29 @@ try {
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 // System instruction for the AI - returns structured JSON
-const systemInstruction = `Sen bir kentsel tasarım uzmanısın. Sadece sana verilen tez verilerine dayanarak cevap ver.
-Kentsel ısı adası etkisini azaltmak için doğa tabanlı çözümler öner. Türkçe cevap ver.
+const systemInstruction = `You are an urban design expert. Answer only based on the thesis data provided to you.
+Suggest nature-based solutions to reduce urban heat island effect. Respond in English.
 
-ÖNEMLI: Yanıtını MUTLAKA aşağıdaki JSON formatında ver, başka bir format kullanma:
+IMPORTANT: You MUST respond in the following JSON format only, do not use any other format:
 {
   "visualAnalysis": {
-    "strength": "Alanın güçlü yönü - tek cümle",
-    "weakness": "Alanın zayıf yönü - tek cümle", 
-    "opportunity": "Fırsat - tek cümle"
+    "strength": "Area's strength - single sentence",
+    "weakness": "Area's weakness - single sentence", 
+    "opportunity": "Opportunity - single sentence"
   },
   "strategy": {
-    "title": "Strateji başlığı",
-    "category": "Kategori (örn: Yeşil Altyapı)",
-    "description": "Strateji açıklaması - 2-3 cümle",
-    "impact": "Beklenen etki"
+    "title": "Strategy title",
+    "category": "Category (e.g., Green Infrastructure)",
+    "description": "Strategy description - 2-3 sentences",
+    "impact": "Expected impact"
   },
   "recommendation": {
-    "title": "Öneri başlığı",
-    "description": "Öneri açıklaması - 2-3 cümle"
+    "title": "Recommendation title",
+    "description": "Recommendation description - 2-3 sentences"
   }
 }
 
-Tez İçeriği:
+Thesis Content:
 ${thesisContext}`;
 
 // POST /api/analyze endpoint
@@ -79,30 +79,30 @@ app.post('/api/analyze', async (req, res) => {
     });
 
     // Build the prompt with location context
-    let prompt = `Bu konum için kentsel serinlik analizi yap ve öneriler sun.`;
+    let prompt = `Analyze this location for urban cooling and provide recommendations.`;
 
     if (locationData) {
       prompt = `
-Bu konum için kentsel serinlik analizi yap ve öneriler sun:
+Analyze this location for urban cooling and provide recommendations:
 
-Konum: ${locationData.name || 'Bilinmiyor'}
-Koordinatlar: ${locationData.lat}, ${locationData.lon}
+Location: ${locationData.name || 'Unknown'}
+Coordinates: ${locationData.lat}, ${locationData.lon}
 ${locationData.scores ? `
-Mevcut Skorlar:
-- NEI (Doğa Entegrasyonu): ${locationData.scores.NEI}/100
-- SWE (Su Yönetimi): ${locationData.scores.SWE}/100
-- HEAT (Isı Yönetimi): ${locationData.scores.HEAT}/100
-- TCI (Termal Konfor): ${locationData.scores.TCI}/100
-- BCI (Biyoiklim): ${locationData.scores.BCI}/100
-- UCIS (Kentsel Serinlik): ${locationData.scores.UCIS}/100
+Current Scores:
+- NEI (Nature Integration): ${locationData.scores.NEI}/100
+- SWE (Water Management): ${locationData.scores.SWE}/100
+- HEAT (Heat Management): ${locationData.scores.HEAT}/100
+- TCI (Thermal Comfort): ${locationData.scores.TCI}/100
+- BCI (Bioclimate): ${locationData.scores.BCI}/100
+- UCIS (Urban Coolness): ${locationData.scores.UCIS}/100
 ` : ''}
 
-Tez bilgilerine dayanarak bu alan için:
-1. Görsel analiz (güçlü yön, zayıf yön, fırsat)
-2. Bir strateji önerisi
-3. Bir uygulama önerisi
+Based on the thesis data, provide for this area:
+1. Visual analysis (strength, weakness, opportunity)
+2. One strategy recommendation
+3. One implementation recommendation
 
-JSON formatında yanıt ver.
+Respond in JSON format.
 `;
     }
 
