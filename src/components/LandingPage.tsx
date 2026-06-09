@@ -76,7 +76,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
       <nav className="landing-navbar" aria-label="Main navigation">
         <div className="navbar-container">
           <div className="navbar-left">
-            <div className="navbar-logo">Coolize</div>
+            <div className="navbar-logo">Narch</div>
             <div className={`navbar-menu ${isMobileMenuOpen ? 'open' : ''}`}>
               <div className="nav-link-wrapper">
                 <a
@@ -144,7 +144,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
             Urban spaces are modeled using a layered, pixel-based approach to generate AI-driven microclimate scores; outdoor areas are analyzed through microclimate profiling, and nature-based strategies are proposed to mitigate the urban heat island effect and improve microclimatic performance.            </p>
             <button className="hero-cta" onClick={onEnterApp}>Get Started</button>
             <div className="scroll-hint">
-              Scroll to see how Coolize works ↓
+              Scroll to see how Narch works ↓
             </div>
           </div>
           <div className="hero-right">
@@ -208,7 +208,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
                 <div className="player-content">
                   <img 
                     src="/app-preview.svg" 
-                    alt="Screenshot of the Coolize climate analysis interface" 
+                    alt="Screenshot of the Narch climate analysis interface" 
                     className="app-preview-image"
                     loading="lazy"
                     onError={(e) => {
@@ -229,7 +229,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
             <div className="features-badge">AI ANALYSIS</div>
             <h2 id="features-title" className="features-title">Turning Urban Climate Data into Real Decisions</h2>
             <p className="features-description">
-              Coolize focuses on what actually matters for urban climate analysis: clear visuals, reliable scoring, and actionable strategies you can use in real projects.
+              Narch focuses on what actually matters for urban climate analysis: clear visuals, reliable scoring, and actionable strategies you can use in real projects.
             </p>
             <div className="feature-cards">
               <div className="feature-card">
@@ -278,7 +278,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
         <div className="steps-container">
           <h2 id="steps-title" className="steps-title">Microclimate strategies in 3 steps</h2>
           <p className="steps-subtitle">
-            No software download or complex tutorials required. Coolize reduces climate analysis to three clear, repeatable steps.
+            No software download or complex tutorials required. Narch reduces climate analysis to three clear, repeatable steps.
           </p>
           <div className="steps-grid">
             <div className="step-card">
@@ -326,7 +326,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
         <div className="pricing-container">
           <h2 id="pricing-title" className="pricing-title">Simple pricing for studios of any size</h2>
           <p className="pricing-subtitle">
-            Start with a free plan for quick studies, then upgrade when you’re ready to bring Coolize into your daily workflow.
+            Start with a free plan for quick studies, then upgrade when you’re ready to bring Narch into your daily workflow.
           </p>
           <div className="pricing-grid">
             <div className="pricing-card">
@@ -368,7 +368,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
         <div className="company-container">
           <h2 id="company-title" className="company-title">Designed for urban climate professionals</h2>
           <p className="company-subtitle">
-            Coolize is built for architects, urban designers and climate consultants who need fast, visual climate insights during design.
+            Narch is built for architects, urban designers and climate consultants who need fast, visual climate insights during design.
           </p>
           <div className="company-grid">
             <div className="company-card">
@@ -399,9 +399,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
               </p>
             </div>
             <div className="faq-item">
-              <h3 className="faq-question">Is Coolize a replacement for full simulation tools?</h3>
+              <h3 className="faq-question">Is Narch a replacement for full simulation tools?</h3>
               <p className="faq-answer">
-                Coolize focuses on fast, early-phase guidance. It complements, rather than replaces, detailed CFD or energy simulations.
+                Narch focuses on fast, early-phase guidance. It complements, rather than replaces, detailed CFD or energy simulations.
               </p>
             </div>
             <div className="faq-item">
@@ -477,7 +477,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
       {/* Blog / Articles Section */}
       <section id="blog" className="articles-section" aria-labelledby="articles-title">
         <div className="articles-container">
-          <h2 id="articles-title" className="articles-title">From the Coolize climate guide</h2>
+          <h2 id="articles-title" className="articles-title">From the Narch climate guide</h2>
           <div className="articles-scroll">
             <div className="article-card">Urban Heat Island Effect</div>
             <div className="article-card">Green Infrastructure Benefits</div>
@@ -489,14 +489,14 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
       </section>
 
       {/* Footer */}
-      <footer className="landing-footer" aria-label="Coolize site footer">
+      <footer className="landing-footer" aria-label="Narch site footer">
         <div className="footer-container">
           <div className="footer-top">
             <div className="footer-brand">
-              <div className="footer-logo">Coolize</div>
+              <div className="footer-logo">Narch</div>
               <p className="footer-tagline">Making professional climate analysis more accessible with AI</p>
               <div className="footer-contact">
-                <p>Coolize Studio, Inc.</p>
+                <p>Narch Studio, Inc.</p>
                 <p>12747 Olive Blvd. Suite 300, Creve Coeur, MO 63141</p>
                 <p>+1 (951) 732-8284</p>
               </div>
@@ -561,7 +561,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
               </button>
             </div>
             <div className="footer-copyright">
-              <p>&copy; 2024 Coolize. All rights reserved.</p>
+              <p>&copy; 2024 Narch. All rights reserved.</p>
             </div>
           </div>
         </div>

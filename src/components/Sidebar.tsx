@@ -115,7 +115,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       const res = await fetch(url, {
         headers: {
           'Accept': 'application/json',
-          'User-Agent': 'coolize-app/1.0 (contact@coolize.app)',
+          'User-Agent': 'narch-app/1.0 (contact@narch.app)',
         },
       });
 

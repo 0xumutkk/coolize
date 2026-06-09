@@ -48,7 +48,7 @@ const TopNavbar: React.FC<TopNavbarProps> = ({ onLogout, onMyWorks }) => {
       <div className="top-navbar-content">
         <div className="top-navbar-left">
           <div className="top-navbar-brand">
-            <h1 className="top-navbar-title">Coolize</h1>
+            <h1 className="top-navbar-title">Narch</h1>
             <small className="top-navbar-subtitle">Climate Guide</small>
           </div>
         </div>
