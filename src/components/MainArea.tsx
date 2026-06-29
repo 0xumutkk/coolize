@@ -42,6 +42,14 @@ const DrawHandler: React.FC<DrawHandlerProps> = ({
 }) => {
   const map = useMap() as any;
   const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const finishPolyAt = useCallback((lat: number, lon: number, includePoint: boolean) => {
+    if (clickTimer.current) {
+      clearTimeout(clickTimer.current);
+      clickTimer.current = null;
+    }
+    if (includePoint) onPolyPoint(lat, lon);
+    onPolyClose();
+  }, [onPolyClose, onPolyPoint]);
 
   // Drag & cursor: disable pan while a draw mode is active
   useEffect(() => {
@@ -97,9 +105,18 @@ const DrawHandler: React.FC<DrawHandlerProps> = ({
       }
     },
     dblclick(e: any) {
-      if (drawMode === 'poly' && drawState !== 'done' && polyPoints.length >= 3) {
-        if (clickTimer.current) { clearTimeout(clickTimer.current); clickTimer.current = null; }
-        onPolyClose();
+      if (drawMode === 'poly' && drawState !== 'done') {
+        // Double-click is commonly used to place the final vertex and close.
+        if (polyPoints.length >= 2) finishPolyAt(e.latlng.lat, e.latlng.lng, true);
+        L.DomEvent.stop(e);
+      }
+    },
+    contextmenu(e: any) {
+      if (drawMode === 'poly' && drawState !== 'done') {
+        // Right-click finishes with existing vertices; if only two exist, use
+        // the right-click point as the third/final vertex.
+        if (polyPoints.length >= 3) finishPolyAt(e.latlng.lat, e.latlng.lng, false);
+        else if (polyPoints.length === 2) finishPolyAt(e.latlng.lat, e.latlng.lng, true);
         L.DomEvent.stop(e);
       }
     },
@@ -216,7 +233,7 @@ const QADrawModeControls: React.FC<{
     <button
       className={`qa-draw-mode-btn${drawMode === 'poly' ? ' active' : ''}`}
       onClick={() => onSetMode(drawMode === 'poly' ? null : 'poly')}
-      title="Çokgen — köşelere tıkla, çift tıkla veya 1. noktaya tıkla"
+      title="Çokgen — köşelere tıkla, çift tıkla, sağ tıkla veya 1. noktaya tıkla"
     >⬡ Çokgen</button>
   </div>
 );
@@ -308,7 +325,7 @@ const MATERIAL_ORDER = [
   // Roof first
   'roof_tiles', 'roof_concrete', 'roof_metal', 'roof_green',
   // Ground surfaces
-  'asphalt', 'concrete', 'permeable',
+  'asphalt', 'concrete', 'paving', 'gravel',
   'dense_tree', 'light_tree', 'grass', 'soil', 'water', 'unknown',
 ];
 
@@ -328,6 +345,7 @@ const KEY_TO_MATERIAL: Record<string, string> = {
   landuse_commercial:  'roof_concrete', // commercial → flat concrete
   landuse_industrial:  'roof_metal',   // industrial → metal sheds
   landuse_retail:      'roof_concrete', // retail → flat concrete
+  landuse_institutional:'unknown',      // campus / hospital / worship grounds are context, not material
   // ── Roads & paved ground ──
   highway_primary:     'asphalt',
   highway_secondary:   'asphalt',
@@ -338,12 +356,13 @@ const KEY_TO_MATERIAL: Record<string, string> = {
   surface_asphalt:     'asphalt',
   // ── Concrete/hard ground surfaces ──
   surface_concrete:    'concrete',
-  // ── Permeable hard surfaces ──
-  highway_footway:     'permeable',
-  surface_paving:      'permeable',
-  surface_gravel:      'permeable',
-  surface_wood_deck:   'permeable',
-  surface_unpaved:     'permeable',
+  // ── Hard paving (granite squares, cobblestone, sett, stone footways) ──
+  highway_footway:     'paving',
+  surface_paving:      'paving',
+  // ── Loose / semi-permeable ground (gravel, sand, unpaved paths) ──
+  surface_gravel:      'gravel',
+  surface_wood_deck:   'gravel',
+  surface_unpaved:     'gravel',
   // ── Dense tree canopy ──
   landuse_forest:      'dense_tree',
   natural_wood:        'dense_tree',
@@ -806,7 +825,7 @@ const QAPercentsPanel: React.FC<QAPercentsPanelProps> = ({
       : (drawState === 'done'         ? `Çokgen kapatıldı (${polyPointCount} nokta) — Alanı Analiz Et'e tıklayın`
         : polyPointCount === 0        ? 'İlk köşeyi yerleştirmek için tıklayın'
         : polyPointCount < 3          ? `${polyPointCount} nokta — ${3 - polyPointCount} nokta daha ekleyin`
-        : `${polyPointCount} nokta — 1. köşeye tıklayın veya çift tıklayarak kapatın`);
+        : `${polyPointCount} nokta — 1. köşeye tıklayın, çift tıklayın veya sağ tıkla kapatın`);
 
   const matBreakdown = result
     ? computeMaterialBreakdown(result.keyBreakdown, result.categoryBreakdown)

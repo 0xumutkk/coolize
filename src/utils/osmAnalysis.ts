@@ -60,15 +60,30 @@ const HIGHWAY_WIDTHS_DEG: Record<string, number> = {
 // ── Surface material helpers ──────────────────────────────────────────────────
 const ASPHALT_SURFACES   = new Set(['asphalt', 'tar', 'chipseal', 'bituminous']);
 const CONCRETE_SURFACES  = new Set(['concrete', 'concrete:lanes', 'concrete:plates']);
-const PAVING_SURFACES    = new Set(['paving_stones', 'cobblestone', 'sett', 'unhewn_cobblestone', 'bricks']);
-const GRAVEL_SURFACES    = new Set(['gravel', 'fine_gravel', 'compacted', 'pebblestone', 'crushed_limestone']);
+const PAVING_SURFACES    = new Set([
+  'paving_stones', 'paving:stones', 'cobblestone', 'sett', 'unhewn_cobblestone', 'bricks',
+  'granite', 'marble', 'stone', 'limestone', 'basalt', 'slate_stone',
+  'tiles', 'ceramic', 'pebblestone', 'compacted', 'flagstone', 'slabs',
+]);
+const GRAVEL_SURFACES    = new Set(['gravel', 'fine_gravel', 'crushed_limestone', 'laterite']);
 const GRASS_SURFACES     = new Set(['grass', 'ground', 'earth', 'mud', 'turf']);
 const DIRT_SURFACES      = new Set(['dirt', 'soil', 'clay']);
 const SAND_SURFACES      = new Set(['sand']);
 const WOOD_SURFACES      = new Set(['wood', 'woodchips', 'boardwalk']);
 const UNPAVED_SURFACES   = new Set(['unpaved', 'grass_paver', 'stepping_stones']);
 
-function classifySurface(s: string): string | null {
+const URBAN_SEMI_PERM_KEYS = new Set([
+  'highway_footway',
+  'landuse_institutional',
+  'surface_paving',
+  'surface_wood_deck',
+]);
+
+function normalizeTagValue(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, '_');
+}
+
+function classifySingleSurface(s: string): string | null {
   if (ASPHALT_SURFACES.has(s))  return 'surface_asphalt';
   if (CONCRETE_SURFACES.has(s)) return 'surface_concrete';
   if (PAVING_SURFACES.has(s))   return 'surface_paving';
@@ -78,6 +93,19 @@ function classifySurface(s: string): string | null {
   if (SAND_SURFACES.has(s))     return 'surface_sand';
   if (WOOD_SURFACES.has(s))     return 'surface_wood_deck';
   if (UNPAVED_SURFACES.has(s))  return 'surface_unpaved';
+  return null;
+}
+
+function classifySurface(value: string): string | null {
+  const surfaces = value
+    .split(';')
+    .map(normalizeTagValue)
+    .filter(Boolean);
+
+  for (const surface of surfaces) {
+    const classified = classifySingleSurface(surface);
+    if (classified) return classified;
+  }
   return null;
 }
 
@@ -93,7 +121,7 @@ function classifyTreeNode(tags: Record<string, string>): string {
 /** Classify a building's roof material using OSM tags.
  *  Priority: roof:material → roof:shape (flat→concrete) → building type heuristic → default (tile). */
 function classifyRoofMaterial(tags: Record<string, string>): string {
-  const rm = (tags['roof:material'] || '').toLowerCase();
+  const rm = normalizeTagValue(tags['roof:material'] || '');
 
   // Explicit roof:material tag
   if (rm) {
@@ -107,11 +135,11 @@ function classifyRoofMaterial(tags: Record<string, string>): string {
   }
 
   // roof:shape=flat strongly implies a concrete or asphalt flat roof
-  const rs = (tags['roof:shape'] || '').toLowerCase();
+  const rs = normalizeTagValue(tags['roof:shape'] || '');
   if (rs === 'flat') return 'roof_concrete';
 
   // building type heuristics (when no explicit roof:material)
-  const bt = (tags.building || '').toLowerCase();
+  const bt = normalizeTagValue(tags.building || '');
   if (['industrial', 'warehouse', 'shed', 'hangar', 'barn'].includes(bt)) return 'roof_metal';
   if (['commercial', 'office', 'retail', 'supermarket', 'mall', 'hotel'].includes(bt)) return 'roof_concrete';
   if (['greenhouse'].includes(bt))   return 'roof_glass';
@@ -132,7 +160,7 @@ function classifyElement(tags: Record<string, string>): string {
 
   // 2. Highway — use surface tag for material accuracy when available
   if (tags.highway) {
-    const h = tags.highway;
+    const h = normalizeTagValue(tags.highway);
     const surf = tags.surface ? classifySurface(tags.surface) : null;
 
     // If surface says it's soft/permeable, trust that over road class
@@ -151,7 +179,7 @@ function classifyElement(tags: Record<string, string>): string {
   // 3. Landuse — expanded to cover many common OSM values that previously fell
   //    through to 'default' and inflated the unknown/Asfalt buckets.
   if (tags.landuse) {
-    const lu = tags.landuse;
+    const lu = normalizeTagValue(tags.landuse);
     // Forest / dense vegetation
     if (lu === 'forest') return 'landuse_forest';
     // Open green
@@ -168,9 +196,8 @@ function classifyElement(tags: Record<string, string>): string {
     if (lu === 'industrial') return 'landuse_industrial';
     if (lu === 'retail') return 'landuse_retail';
     if (['residential', 'garages'].includes(lu)) return 'landuse_residential';
-    if (['education', 'school', 'university', 'college'].includes(lu)) return 'landuse_commercial';
-    if (['healthcare', 'hospital'].includes(lu)) return 'landuse_commercial';
-    if (['religious', 'place_of_worship'].includes(lu)) return 'landuse_residential';
+    if (['education', 'school', 'university', 'college', 'institutional'].includes(lu)) return 'landuse_institutional';
+    if (['healthcare', 'hospital', 'religious', 'place_of_worship'].includes(lu)) return 'landuse_institutional';
     // Hard surfaces
     if (lu === 'parking') return 'landuse_parking';
     if (['railway', 'port', 'depot'].includes(lu)) return 'highway_service';
@@ -183,7 +210,7 @@ function classifyElement(tags: Record<string, string>): string {
 
   // 4. Natural features — tree nodes get leaf-type detail
   if (tags.natural) {
-    const n = tags.natural;
+    const n = normalizeTagValue(tags.natural);
     if (n === 'tree') return classifyTreeNode(tags);
     if (n === 'wood' || n === 'scrubland') {
       const lt = tags.leaf_type;
@@ -202,7 +229,7 @@ function classifyElement(tags: Record<string, string>): string {
 
   // 5. Leisure — expanded
   if (tags.leisure) {
-    const l = tags.leisure;
+    const l = normalizeTagValue(tags.leisure);
     if (['park', 'nature_reserve', 'cemetery', 'dog_park', 'playground',
          'recreation_ground', 'common', 'forest'].includes(l)) return 'leisure_park';
     if (l === 'garden') return 'leisure_garden';
@@ -213,17 +240,16 @@ function classifyElement(tags: Record<string, string>): string {
 
   // 6. Amenity areas — most fall to non-building classifications
   if (tags.amenity) {
-    const a = tags.amenity;
+    const a = normalizeTagValue(tags.amenity);
     if (['grave_yard', 'cemetery'].includes(a)) return 'leisure_park';
     if (a === 'parking') return 'landuse_parking';
-    if (['school', 'university', 'college', 'hospital', 'clinic'].includes(a)) return 'landuse_commercial';
-    if (['place_of_worship', 'monastery'].includes(a)) return 'landuse_residential';
+    if (['school', 'university', 'college', 'hospital', 'clinic', 'place_of_worship', 'monastery'].includes(a)) return 'landuse_institutional';
     if (['park', 'community_centre'].includes(a)) return 'leisure_park';
   }
 
   // 7. Waterway
   if (tags.waterway) {
-    const w = tags.waterway;
+    const w = normalizeTagValue(tags.waterway);
     if (w === 'river') return 'waterway_river';
     if (['stream', 'canal', 'drain', 'ditch'].includes(w)) return 'waterway_stream';
   }
@@ -283,7 +309,7 @@ function buildOverpassQuery(area: AnalysisArea): string {
   const spatial = isBBox(area)
     ? `(${area.south},${area.west},${area.north},${area.east})`
     : `(poly:"${area.points.map(p => `${p.lat} ${p.lon}`).join(' ')}")`;
-  return `[out:json][timeout:30];
+  return `[out:json][timeout:25];
 (
   way["building"]${spatial};
   way["highway"]${spatial};
@@ -294,7 +320,6 @@ function buildOverpassQuery(area: AnalysisArea): string {
   way["surface"]${spatial};
   way["amenity"~"grave_yard|cemetery|parking|school|university|hospital|place_of_worship"]${spatial};
   node["natural"="tree"]${spatial};
-  node["amenity"="parking"]${spatial};
 );
 out geom;`;
 }
@@ -309,6 +334,22 @@ function polyToBBox(points: Array<{ lat: number; lon: number }>): BBox {
 }
 
 const TREE_NODE_AREA_DEG2 = 0.000000028; // ~25m² canopy proxy in degrees²
+const OVERPASS_ENDPOINTS = [
+  'https://overpass.kumi.systems/api/interpreter',
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.osm.ch/api/interpreter',
+];
+
+function overpassErrorMessage(err: unknown): string {
+  const message = err instanceof Error ? err.message : String(err);
+  if (message.includes('504') || message.includes('timeout')) {
+    return 'OpenStreetMap veri servisi zaman aşımına uğradı. Lütfen tekrar deneyin veya biraz daha küçük bir alan seçin.';
+  }
+  if (message.includes('429')) {
+    return 'OpenStreetMap veri servisi şu an çok yoğun. Biraz bekleyip tekrar deneyin.';
+  }
+  return 'OpenStreetMap verisi alınamadı. İnternet bağlantısını kontrol edip tekrar deneyin.';
+}
 
 /** Calls the /api/overpass Vercel proxy (avoids CORS issues in production).
  *  Falls back to a direct Overpass request for local dev where the proxy isn't running. */
@@ -341,19 +382,22 @@ async function fetchOSMData(query: string): Promise<any> {
     }
   }
 
-  // Local dev: call Overpass directly (no CORS issue on localhost)
-  const ENDPOINTS = [
-    'https://overpass-api.de/api/interpreter',
-    'https://overpass.kumi.systems/api/interpreter',
-  ];
+  // Local dev: call Overpass directly. POST is more reliable than a long
+  // querystring URL and lets us fail over cleanly between public mirrors.
   let lastErr: unknown;
-  for (const base of ENDPOINTS) {
+  const postBody = `data=${encodeURIComponent(query)}`;
+  for (const endpoint of OVERPASS_ENDPOINTS) {
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 30_000);
+    const timer = setTimeout(() => ctrl.abort(), 28_000);
     try {
       const res = await Promise.race([
-        fetch(`${base}?data=${encodeURIComponent(query)}`, { signal: ctrl.signal }),
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 31_000)),
+        fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: postBody,
+          signal: ctrl.signal,
+        }),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 29_000)),
       ]) as Response;
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return await res.json();
@@ -363,7 +407,7 @@ async function fetchOSMData(query: string): Promise<any> {
       clearTimeout(timer);
     }
   }
-  throw lastErr ?? new Error('Tüm Overpass sunucularına bağlanılamadı.');
+  throw new Error(overpassErrorMessage(lastErr ?? new Error('Tüm Overpass sunucularına bağlanılamadı.')));
 }
 
 export async function analyzeArea(area: AnalysisArea): Promise<AnalysisResult> {
@@ -437,15 +481,18 @@ export async function analyzeArea(area: AnalysisArea): Promise<AnalysisResult> {
 
   if (uncovered > 0) {
     // Context-aware default: look at what IS identified to guess the gap.
-    const identifiedBuilding   = (categoryAreas['building']   || 0) / Math.max(rawFeatureSum, 1);
-    const identifiedImpervious = (categoryAreas['impervious'] || 0) / Math.max(rawFeatureSum, 1);
-    const identifiedVegetation = (categoryAreas['vegetation'] || 0) / Math.max(rawFeatureSum, 1);
-    const identifiedWater      = (categoryAreas['water']      || 0) / Math.max(rawFeatureSum, 1);
+    const identifiedArea = Math.max(rawFeatureSum, Number.EPSILON);
+    const identifiedBuilding   = (categoryAreas['building']   || 0) / identifiedArea;
+    const identifiedImpervious = (categoryAreas['impervious'] || 0) / identifiedArea;
+    const identifiedVegetation = (categoryAreas['vegetation'] || 0) / identifiedArea;
+    const identifiedWater      = (categoryAreas['water']      || 0) / identifiedArea;
+    const identifiedUrbanSemiPerm = Array.from(URBAN_SEMI_PERM_KEYS)
+      .reduce((sum, key) => sum + (keyAreas[key] || 0), 0) / identifiedArea;
 
-    // In urban areas (>30% built environment) untagged gaps are mostly hard
-    // surfaces (sidewalks, courtyards, small alleys) — treat as semi-impervious.
+    // In urban areas (>30% built, road, or hard pedestrian context) untagged
+    // gaps are mostly paved squares, sidewalks, courtyards, and alleys.
     // In green areas (>30% vegetation) untagged gaps lean toward grass/soil.
-    const urbanRatio = identifiedBuilding + identifiedImpervious;
+    const urbanRatio = identifiedBuilding + identifiedImpervious + identifiedUrbanSemiPerm;
     const greenRatio = identifiedVegetation + identifiedWater;
 
     let gapHeatLoad: number, gapCooling: number, gapMorph: number;
@@ -525,6 +572,7 @@ export async function analyzeArea(area: AnalysisArea): Promise<AnalysisResult> {
     morphologyRisk,
     anthropogenicPressure,
     categoryBreakdown,
+    keyBreakdown,
   });
 
   return {
@@ -545,43 +593,81 @@ interface SWOTInput {
   morphologyRisk: number;
   anthropogenicPressure: number;
   categoryBreakdown: Record<string, number>;
+  keyBreakdown: Record<string, number>;
 }
 
 function generateSWOT(input: SWOTInput) {
-  const { surfaceHeatLoad, vegetationCooling, waterRegulation, morphologyRisk, categoryBreakdown } = input;
+  const { surfaceHeatLoad, vegetationCooling, waterRegulation, morphologyRisk, categoryBreakdown, keyBreakdown } = input;
 
   const strengths: string[] = [];
   const weaknesses: string[] = [];
   const opportunities: string[] = [];
   const threats: string[] = [];
 
+  const sumKeys = (keys: string[]) => keys.reduce((sum, key) => sum + (keyBreakdown[key] || 0), 0);
+  const buildingPct = categoryBreakdown['building'] || 0;
+  const imperviousPct = categoryBreakdown['impervious'] || 0;
+  const vegetationPct = categoryBreakdown['vegetation'] || 0;
+  const institutionalPct = keyBreakdown['landuse_institutional'] || 0;
+  const asphaltPct = sumKeys([
+    'surface_asphalt',
+    'landuse_parking',
+    'highway_primary',
+    'highway_secondary',
+    'highway_tertiary',
+    'highway_residential',
+    'highway_service',
+  ]);
+  const pavingPct = sumKeys(['surface_paving', 'highway_footway']);
+  const loosePct = sumKeys(['surface_gravel', 'surface_unpaved', 'surface_wood_deck', 'surface_dirt', 'surface_sand']);
+  const treePct = sumKeys([
+    'natural_tree',
+    'natural_wood',
+    'tree_deciduous',
+    'tree_evergreen',
+    'tree_mixed',
+    'natural_scrub',
+    'leisure_park',
+    'leisure_garden',
+  ]);
+  const grassPct = sumKeys(['surface_grass', 'landuse_grass', 'landuse_meadow', 'natural_grassland', 'leisure_pitch']);
+  const hasOpenInstitutionalGreen = institutionalPct >= 20 && vegetationPct >= 25;
+
   // Strengths
-  if (vegetationCooling >= 50) strengths.push('Geniş bitki örtüsü doğal soğutma ve gölge sağlıyor');
+  if (hasOpenInstitutionalGreen) strengths.push('Açık kampüs/kurumsal yeşil doku yapı yoğunluğunu düşürerek havalandırmayı destekliyor');
+  if (treePct >= 25) strengths.push('Mevcut ağaç dokusu yaya akslarında gölge ve doğal soğutma sağlıyor');
+  else if (vegetationCooling >= 50) strengths.push('Yeşil örtü doğal soğutma ve gölge potansiyeli sağlıyor');
+  if (grassPct >= 20) strengths.push('Çim/çayırlık yüzeyler sert zeminlere göre ısı emilimini sınırlıyor');
   if (waterRegulation >= 40) strengths.push('Su unsurları yerel buharlaşma yoluyla soğutmaya katkı sağlıyor');
   if (morphologyRisk < 35) strengths.push('Açık kentsel doku doğal havalandırma koridorlarını destekliyor');
-  if ((categoryBreakdown['vegetation'] || 0) >= 25) strengths.push('Ortalamanın üzerinde yeşil örtü ısı yükünü azaltıyor');
-  if (surfaceHeatLoad < 40) strengths.push('Düşük geçirimsiz yüzey oranı ısı emilimini sınırlıyor');
+  if (imperviousPct < 15 && asphaltPct < 10) strengths.push('Asfalt ve koyu geçirimsiz yüzey oranı düşük olduğu için ısı birikimi sınırlı');
 
   // Weaknesses
   if (surfaceHeatLoad >= 65) weaknesses.push('Yüksek oranda koyu geçirimsiz yüzeyler ısı birikimine yol açıyor');
-  if (vegetationCooling < 30) weaknesses.push('Etkin soğutma için ağaç gölgesi ve yeşil örtü yetersiz kalıyor');
+  if (treePct < 20 && vegetationCooling < 50) weaknesses.push('Sürekli gölge sağlayacak ağaç örtüsü bazı yaya güzergahlarında zayıf kalıyor');
+  else if (vegetationCooling < 30) weaknesses.push('Etkin soğutma için ağaç gölgesi ve yeşil örtü yetersiz kalıyor');
   if (waterRegulation < 25) weaknesses.push('Su unsurlarının yokluğu buharlaşmalı soğutma potansiyelini kısıtlıyor');
   if (morphologyRisk >= 60) weaknesses.push('Yoğun yapı kütlesi hava akışını engelliyor ve ısıyı hapsediyor');
-  if ((categoryBreakdown['impervious'] || 0) >= 40) weaknesses.push('Geniş yol ve otopark yüzeyleri birbirine bağlı ısı koridorları oluşturuyor');
+  if (asphaltPct >= 20) weaknesses.push('Asfalt ve servis yolu yüzeyleri yerel ısı yükünü artırıyor');
+  if (pavingPct >= 35) weaknesses.push('Sert kaplama yaya yüzeyleri gölgesiz kaldığında öğlen saatlerinde termal konforu düşürebilir');
+  if (buildingPct >= 30) weaknesses.push('Yapı/çatı yüzeyi oranı açık alan soğutma etkisini sınırlıyor');
 
   // Opportunities
-  if (surfaceHeatLoad >= 55) opportunities.push('Geçirimsiz yüzeyler geçirgen veya yansıtıcı malzemelerle yenilenebilir');
-  if (vegetationCooling < 50) opportunities.push('Cadde boyunca doğrusal ağaç dikimi gölgeleme koridoru yaratabilir');
-  if (waterRegulation < 30) opportunities.push('Açık alanlara su unsurları veya biyosuya kanalları eklenebilir');
-  if ((categoryBreakdown['building'] || 0) >= 30) opportunities.push('Mevcut binalarda yeşil çatı ve duvar uygulaması potansiyeli var');
-  opportunities.push('Düşük yoğunluklu boşluklara cep park eklemeleri anlık soğutma odakları oluşturabilir');
+  if (hasOpenInstitutionalGreen) opportunities.push('Açık kampüs alanında mevcut yaya aksları gölgeli, geçirgen ve serin dinlenme cepleriyle yeniden düzenlenebilir');
+  if (pavingPct >= 15) opportunities.push('Sert kaplama yaya yüzeyleri açık renkli/doğal taş ve geçirgen derzlerle ısı yükü düşük hale getirilebilir');
+  if (loosePct >= 10) opportunities.push('Gevşek veya belirsiz zeminler stabilize geçirgen kaplama ile erişilebilir ama serin yüzeye dönüştürülebilir');
+  if (treePct < 35 && vegetationPct >= 20) opportunities.push('Mevcut yeşil doku, yaya yolları boyunca gölge sürekliliği verecek ağaç kümeleriyle tamamlanabilir');
+  if (waterRegulation < 30) opportunities.push('Açık alanın düşük kotlu kenarlarında yağmur bahçesi, biyoswale veya sığ su öğeleri eklenebilir');
+  if (buildingPct >= 30) opportunities.push('Mevcut binalarda yeşil çatı ve duvar uygulaması potansiyeli var');
+  if (!hasOpenInstitutionalGreen && morphologyRisk < 45) opportunities.push('Düşük yoğunluklu boşluklara cep park eklemeleri anlık soğutma odakları oluşturabilir');
   if (morphologyRisk >= 50) opportunities.push('Rüzgar koridoru analizi havalandırma iyileştirme noktalarını belirleyebilir');
 
   // Threats
   if (surfaceHeatLoad >= 60) threats.push('Yaya bölgelerinde ısı dalgası döneminde termal konfor riski yüksek');
   if (morphologyRisk >= 55) threats.push('Yoğun yapı kütlesi gece ısı tutarak kentsel ısı adasını güçlendiriyor');
-  if ((categoryBreakdown['impervious'] || 0) >= 35) threats.push('Düşük geçirgenlik yağmur döneminde hem sel hem ısı riskini artırıyor');
-  threats.push('Yapılaşma baskısıyla yeşil örtünün giderek azalması UHI\'yı daha da kötüleştirebilir');
+  if (imperviousPct >= 35) threats.push('Düşük geçirgenlik yağmur döneminde hem sel hem ısı riskini artırıyor');
+  if (hasOpenInstitutionalGreen) threats.push('Açık yeşil kampüs alanının sert kaplama veya yapılaşma baskısıyla azalması soğutma etkisini zayıflatabilir');
+  else threats.push('Yapılaşma baskısıyla yeşil örtünün giderek azalması UHI\'yı daha da kötüleştirebilir');
   if (input.uhiScore >= 60) threats.push('Artan kentsel ısı, müdahale olmadan açık alan kullanımını kısıtlayabilir');
 
   return { strengths, weaknesses, opportunities, threats };

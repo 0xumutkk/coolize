@@ -22,6 +22,7 @@ export const OSM_PARAMETER_MAP: Record<string, FeatureParams> = {
   landuse_industrial:   { heatLoad: 0.85, coolingPotential: 0.03, morphologyImpact: 0.45, category: 'building' },
   landuse_retail:       { heatLoad: 0.80, coolingPotential: 0.05, morphologyImpact: 0.45, category: 'building' },
   landuse_residential:  { heatLoad: 0.60, coolingPotential: 0.20, morphologyImpact: 0.40, category: 'building' },
+  landuse_institutional:{ heatLoad: 0.48, coolingPotential: 0.18, morphologyImpact: 0.10, category: 'semi_perm' },
   landuse_parking:      { heatLoad: 0.88, coolingPotential: 0.02, morphologyImpact: 0.20, category: 'impervious' },
 
   natural_tree:         { heatLoad: 0.05, coolingPotential: 0.85, morphologyImpact: 0.00, category: 'vegetation' },

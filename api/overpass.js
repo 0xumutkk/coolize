@@ -4,11 +4,12 @@
 const https = require('https');
 
 const ENDPOINTS = [
-  'https://overpass-api.de/api/interpreter',
   'https://overpass.kumi.systems/api/interpreter',
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.osm.ch/api/interpreter',
 ];
 
-const TIMEOUT_MS = 28000;
+const TIMEOUT_MS = 25000;
 
 function httpsPost(urlStr, postData) {
   return new Promise((resolve, reject) => {
@@ -91,5 +92,7 @@ module.exports = async function handler(req, res) {
     }
   }
 
-  return res.status(502).json({ error: 'All Overpass endpoints failed. Please try again.' });
+  return res.status(504).json({
+    error: 'OpenStreetMap veri servisi zaman aşımına uğradı. Lütfen tekrar deneyin veya biraz daha küçük bir alan seçin.'
+  });
 };
