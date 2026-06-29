@@ -281,37 +281,53 @@ const QAFullscreenOverlay: React.FC<QAFullscreenOverlayProps> = ({
 };
 
 // ─── Material category definitions ───────────────────────────────────────────
-// "Bina" is NOT a surface material — building footprints are remapped to
-// concrete/asphalt since their rooftop and base surfaces are hard impervious.
+// OSM data is 2-D (footprints). From a bird's-eye UHI perspective the visible
+// surface of a building is its ROOF. We therefore classify each building
+// polygon by its roof material (roof:material tag, or a type-based default).
 interface MatMeta { label: string; color: string }
 const MATERIAL_CATEGORY_META: Record<string, MatMeta> = {
-  asphalt:    { label: 'Asfalt',               color: '#1e293b' },
-  concrete:   { label: 'Beton / Sert Zemin',   color: '#64748b' },
-  permeable:  { label: 'Geçirgen Taş / Çakıl', color: '#78716c' },
-  dense_tree: { label: 'Ağaç (yoğun)',         color: '#15803d' },
-  light_tree: { label: 'Ağaç (hafif)',          color: '#4d7c0f' },
-  grass:      { label: 'Çim / Çayırlık',       color: '#16a34a' },
-  soil:       { label: 'Toprak / Kum',          color: '#92400e' },
-  water:      { label: 'Su',                    color: '#0369a1' },
-  unknown:    { label: 'Sınıflandırılmamış',   color: '#94a3b8' },
+  // ── Roof materials ──────────────────────────────────────────────────────────
+  roof_tiles:    { label: 'Kiremit Çatı',       color: '#c2410c' },  // terracotta orange-brown
+  roof_concrete: { label: 'Beton Çatı',         color: '#475569' },  // dark slate
+  roof_metal:    { label: 'Metal Çatı',         color: '#9ca3af' },  // silver-gray
+  roof_green:    { label: 'Yeşil Çatı',         color: '#166534' },  // deep green
+  // ── Ground surfaces ─────────────────────────────────────────────────────────
+  asphalt:       { label: 'Asfalt',             color: '#1e293b' },
+  concrete:      { label: 'Beton Zemin',        color: '#64748b' },
+  permeable:     { label: 'Geçirgen Zemin',     color: '#78716c' },
+  dense_tree:    { label: 'Ağaç (yoğun)',       color: '#15803d' },
+  light_tree:    { label: 'Ağaç (hafif)',        color: '#4d7c0f' },
+  grass:         { label: 'Çim / Çayırlık',     color: '#16a34a' },
+  soil:          { label: 'Toprak / Kum',       color: '#92400e' },
+  water:         { label: 'Su',                 color: '#0369a1' },
+  unknown:       { label: 'Sınıflandırılmamış', color: '#94a3b8' },
 };
 
 const MATERIAL_ORDER = [
+  // Roof first
+  'roof_tiles', 'roof_concrete', 'roof_metal', 'roof_green',
+  // Ground surfaces
   'asphalt', 'concrete', 'permeable',
   'dense_tree', 'light_tree', 'grass', 'soil', 'water', 'unknown',
 ];
 
 // OSM key → material category
-// Buildings → concrete (hard impervious roof/base surface)
-// Commercial/industrial landuse → asphalt (mix of paved surfaces around buildings)
 const KEY_TO_MATERIAL: Record<string, string> = {
-  // Building footprints → treated as concrete surface
-  building:            'concrete',
-  landuse_commercial:  'asphalt',
-  landuse_industrial:  'asphalt',
-  landuse_retail:      'asphalt',
-  landuse_residential: 'concrete',
-  // Roads → asphalt
+  // ── Roof material keys (returned by classifyRoofMaterial in osmAnalysis) ──
+  roof_tiles:          'roof_tiles',
+  roof_concrete:       'roof_concrete',
+  roof_metal:          'roof_metal',
+  roof_green:          'roof_green',
+  roof_asphalt:        'asphalt',      // tar-paper flat roof → ground asphalt bucket
+  roof_slate:          'roof_concrete', // slate → concrete bucket (similar thermal)
+  roof_glass:          'roof_concrete', // glass atrium → concrete bucket
+  // ── Landuse zones (whole districts, not individual buildings) ──
+  building:            'roof_tiles',    // legacy fallback
+  landuse_residential: 'roof_tiles',   // residential zones → tile roofs
+  landuse_commercial:  'roof_concrete', // commercial → flat concrete
+  landuse_industrial:  'roof_metal',   // industrial → metal sheds
+  landuse_retail:      'roof_concrete', // retail → flat concrete
+  // ── Roads & paved ground ──
   highway_primary:     'asphalt',
   highway_secondary:   'asphalt',
   highway_tertiary:    'asphalt',
@@ -319,35 +335,35 @@ const KEY_TO_MATERIAL: Record<string, string> = {
   highway_service:     'asphalt',
   landuse_parking:     'asphalt',
   surface_asphalt:     'asphalt',
-  // Concrete/hard surfaces
+  // ── Concrete/hard ground surfaces ──
   surface_concrete:    'concrete',
-  // Permeable hard surfaces
+  // ── Permeable hard surfaces ──
   highway_footway:     'permeable',
   surface_paving:      'permeable',
   surface_gravel:      'permeable',
   surface_wood_deck:   'permeable',
   surface_unpaved:     'permeable',
-  // Dense tree canopy
+  // ── Dense tree canopy ──
   landuse_forest:      'dense_tree',
   natural_wood:        'dense_tree',
   tree_deciduous:      'dense_tree',
   tree_evergreen:      'dense_tree',
   tree_mixed:          'dense_tree',
-  // Light vegetation
+  // ── Light / scattered vegetation ──
   natural_tree:        'light_tree',
   natural_scrub:       'light_tree',
   leisure_park:        'light_tree',
   leisure_garden:      'light_tree',
-  // Grass
+  // ── Grass / meadow ──
   leisure_pitch:       'grass',
   landuse_grass:       'grass',
   landuse_meadow:      'grass',
   natural_grassland:   'grass',
   surface_grass:       'grass',
-  // Soil
+  // ── Bare soil / sand ──
   surface_dirt:        'soil',
   surface_sand:        'soil',
-  // Water
+  // ── Water ──
   natural_water:       'water',
   natural_wetland:     'water',
   waterway_river:      'water',

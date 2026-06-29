@@ -57,6 +57,22 @@ export const OSM_PARAMETER_MAP: Record<string, FeatureParams> = {
   tree_evergreen:       { heatLoad: 0.05, coolingPotential: 0.85, morphologyImpact: 0.00, category: 'vegetation' },
   tree_mixed:           { heatLoad: 0.05, coolingPotential: 0.87, morphologyImpact: 0.00, category: 'vegetation' },
 
+  // ── Roof material types (from OSM roof:material=* tag) ──────────────────────
+  // Kiremit (terracotta / clay tile) — dominant in Turkish residential areas
+  roof_tiles:           { heatLoad: 0.62, coolingPotential: 0.10, morphologyImpact: 0.80, category: 'building' },
+  // Flat reinforced-concrete slab — common in commercial & multi-storey buildings
+  roof_concrete:        { heatLoad: 0.82, coolingPotential: 0.03, morphologyImpact: 0.80, category: 'building' },
+  // Corrugated steel / metal sheet — warehouses, industrial sheds
+  roof_metal:           { heatLoad: 0.88, coolingPotential: 0.02, morphologyImpact: 0.80, category: 'building' },
+  // Built-up asphalt / tar-paper flat roof
+  roof_asphalt:         { heatLoad: 0.90, coolingPotential: 0.01, morphologyImpact: 0.80, category: 'building' },
+  // Green / living roof (sedum, grass, soil substrate)
+  roof_green:           { heatLoad: 0.15, coolingPotential: 0.72, morphologyImpact: 0.80, category: 'building' },
+  // Natural slate or stone tile
+  roof_slate:           { heatLoad: 0.58, coolingPotential: 0.08, morphologyImpact: 0.80, category: 'building' },
+  // Glass or polycarbonate (greenhouses, atrium roofs)
+  roof_glass:           { heatLoad: 0.70, coolingPotential: 0.05, morphologyImpact: 0.80, category: 'building' },
+
   default:              { heatLoad: 0.50, coolingPotential: 0.20, morphologyImpact: 0.20, category: 'unknown' },
 };
 
@@ -69,10 +85,10 @@ export const SCORE_WEIGHTS = {
 };
 
 export const UHI_RISK_LEVELS = [
-  { max: 30,  label: 'Low Risk',      color: '#3b82f6', description: 'Area has good cooling elements and low heat load.' },
-  { max: 55,  label: 'Moderate Risk', color: '#f59e0b', description: 'Moderate UHI potential with some cooling deficit.' },
-  { max: 75,  label: 'High Risk',     color: '#f97316', description: 'Significant heat pressure. Intervention recommended.' },
-  { max: 100, label: 'Critical',      color: '#ef4444', description: 'Severe UHI conditions. Urgent greening needed.' },
+  { max: 30,  label: 'Düşük Risk',  color: '#3b82f6', description: 'Alanda iyi soğutma unsurları ve düşük ısı yükü mevcut.' },
+  { max: 55,  label: 'Orta Risk',   color: '#f59e0b', description: 'Orta düzeyde UHI potansiyeli; bir miktar soğutma açığı var.' },
+  { max: 75,  label: 'Yüksek Risk', color: '#f97316', description: 'Belirgin ısı baskısı. Müdahale önerilir.' },
+  { max: 100, label: 'Kritik',      color: '#ef4444', description: 'Ağır UHI koşulları. Acil yeşillendirme gerekli.' },
 ];
 
 export function getRiskLevel(score: number) {

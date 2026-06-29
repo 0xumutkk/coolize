@@ -90,9 +90,45 @@ function classifyTreeNode(tags: Record<string, string>): string {
   return 'natural_tree';
 }
 
+/** Classify a building's roof material using OSM tags.
+ *  Priority: roof:material → roof:shape (flat→concrete) → building type heuristic → default (tile). */
+function classifyRoofMaterial(tags: Record<string, string>): string {
+  const rm = (tags['roof:material'] || '').toLowerCase();
+
+  // Explicit roof:material tag
+  if (rm) {
+    if (['tile', 'tiles', 'roof_tiles', 'terracotta', 'clay', 'ceramic'].includes(rm)) return 'roof_tiles';
+    if (['concrete', 'reinforced_concrete', 'cement'].includes(rm))                    return 'roof_concrete';
+    if (['metal', 'steel', 'iron', 'zinc', 'copper', 'aluminium', 'aluminum', 'tin'].includes(rm)) return 'roof_metal';
+    if (['grass', 'green', 'plants', 'sedum', 'living'].includes(rm))                 return 'roof_green';
+    if (['asphalt', 'tar_paper', 'bitumen', 'felt', 'gravel'].includes(rm))           return 'roof_asphalt';
+    if (['slate', 'stone', 'rock'].includes(rm))                                       return 'roof_slate';
+    if (['glass', 'polycarbonate', 'plastic', 'acrylic'].includes(rm))                return 'roof_glass';
+  }
+
+  // roof:shape=flat strongly implies a concrete or asphalt flat roof
+  const rs = (tags['roof:shape'] || '').toLowerCase();
+  if (rs === 'flat') return 'roof_concrete';
+
+  // building type heuristics (when no explicit roof:material)
+  const bt = (tags.building || '').toLowerCase();
+  if (['industrial', 'warehouse', 'shed', 'hangar', 'barn'].includes(bt)) return 'roof_metal';
+  if (['commercial', 'office', 'retail', 'supermarket', 'mall', 'hotel'].includes(bt)) return 'roof_concrete';
+  if (['greenhouse'].includes(bt))   return 'roof_glass';
+  if (['apartments', 'dormitory', 'block of flats'].includes(bt)) {
+    // Multi-storey apartments in Turkey often have flat concrete roofs
+    const lvl = parseInt(tags['building:levels'] || '0', 10);
+    if (lvl >= 5) return 'roof_concrete';
+  }
+  if (['house', 'detached', 'semidetached_house', 'terrace', 'bungalow', 'cabin', 'farm'].includes(bt)) return 'roof_tiles';
+
+  // Default: kiremit (terracotta tile) is the most common roof type in Turkey
+  return 'roof_tiles';
+}
+
 function classifyElement(tags: Record<string, string>): string {
-  // 1. Buildings always win
-  if (tags.building && tags.building !== 'no') return 'building';
+  // 1. Buildings — classified by their roof material (top-down / 2-D view)
+  if (tags.building && tags.building !== 'no') return classifyRoofMaterial(tags);
 
   // 2. Highway — use surface tag for material accuracy when available
   if (tags.highway) {
@@ -235,7 +271,7 @@ async function fetchOSMData(query: string): Promise<any> {
       return await res.json();
     } catch (err: any) {
       const isAbort = err?.name === 'AbortError' || err?.message?.includes('abort');
-      if (isAbort) throw new Error('Request timed out. Try again or draw a smaller area.');
+      if (isAbort) throw new Error('İstek zaman aşımına uğradı. Tekrar deneyin veya daha küçük bir alan çizin.');
       throw err;
     } finally {
       clearTimeout(timer);
@@ -264,7 +300,7 @@ async function fetchOSMData(query: string): Promise<any> {
       clearTimeout(timer);
     }
   }
-  throw lastErr ?? new Error('All Overpass endpoints failed');
+  throw lastErr ?? new Error('Tüm Overpass sunucularına bağlanılamadı.');
 }
 
 export async function analyzeArea(area: AnalysisArea): Promise<AnalysisResult> {
@@ -454,33 +490,33 @@ function generateSWOT(input: SWOTInput) {
   const threats: string[] = [];
 
   // Strengths
-  if (vegetationCooling >= 50) strengths.push('Significant vegetation provides natural cooling and shade');
-  if (waterRegulation >= 40) strengths.push('Water elements contribute to local evaporative cooling');
-  if (morphologyRisk < 35) strengths.push('Open spatial structure supports natural ventilation corridors');
-  if ((categoryBreakdown['vegetation'] || 0) >= 25) strengths.push('Above-average green coverage reduces heat load');
-  if (surfaceHeatLoad < 40) strengths.push('Low impervious surface ratio limits heat absorption');
+  if (vegetationCooling >= 50) strengths.push('Geniş bitki örtüsü doğal soğutma ve gölge sağlıyor');
+  if (waterRegulation >= 40) strengths.push('Su unsurları yerel buharlaşma yoluyla soğutmaya katkı sağlıyor');
+  if (morphologyRisk < 35) strengths.push('Açık kentsel doku doğal havalandırma koridorlarını destekliyor');
+  if ((categoryBreakdown['vegetation'] || 0) >= 25) strengths.push('Ortalamanın üzerinde yeşil örtü ısı yükünü azaltıyor');
+  if (surfaceHeatLoad < 40) strengths.push('Düşük geçirimsiz yüzey oranı ısı emilimini sınırlıyor');
 
   // Weaknesses
-  if (surfaceHeatLoad >= 65) weaknesses.push('High proportion of dark impervious surfaces drives heat accumulation');
-  if (vegetationCooling < 30) weaknesses.push('Insufficient tree canopy and green cover for effective cooling');
-  if (waterRegulation < 25) weaknesses.push('Absence of water elements limits evaporative cooling potential');
-  if (morphologyRisk >= 60) weaknesses.push('Dense building mass restricts airflow and traps heat');
-  if ((categoryBreakdown['impervious'] || 0) >= 40) weaknesses.push('Extensive road and parking surfaces form connected heat corridors');
+  if (surfaceHeatLoad >= 65) weaknesses.push('Yüksek oranda koyu geçirimsiz yüzeyler ısı birikimine yol açıyor');
+  if (vegetationCooling < 30) weaknesses.push('Etkin soğutma için ağaç gölgesi ve yeşil örtü yetersiz kalıyor');
+  if (waterRegulation < 25) weaknesses.push('Su unsurlarının yokluğu buharlaşmalı soğutma potansiyelini kısıtlıyor');
+  if (morphologyRisk >= 60) weaknesses.push('Yoğun yapı kütlesi hava akışını engelliyor ve ısıyı hapsediyor');
+  if ((categoryBreakdown['impervious'] || 0) >= 40) weaknesses.push('Geniş yol ve otopark yüzeyleri birbirine bağlı ısı koridorları oluşturuyor');
 
   // Opportunities
-  if (surfaceHeatLoad >= 55) opportunities.push('Retrofit impervious surfaces with permeable or reflective materials');
-  if (vegetationCooling < 50) opportunities.push('Linear tree planting along streets to create shading corridors');
-  if (waterRegulation < 30) opportunities.push('Introduce water features or bioswales in open spaces');
-  if ((categoryBreakdown['building'] || 0) >= 30) opportunities.push('Green roof and wall potential on existing building stock');
-  opportunities.push('Pocket park insertions at low-density gaps can generate immediate cooling nodes');
-  if (morphologyRisk >= 50) opportunities.push('Wind corridor analysis to identify ventilation improvement points');
+  if (surfaceHeatLoad >= 55) opportunities.push('Geçirimsiz yüzeyler geçirgen veya yansıtıcı malzemelerle yenilenebilir');
+  if (vegetationCooling < 50) opportunities.push('Cadde boyunca doğrusal ağaç dikimi gölgeleme koridoru yaratabilir');
+  if (waterRegulation < 30) opportunities.push('Açık alanlara su unsurları veya biyosuya kanalları eklenebilir');
+  if ((categoryBreakdown['building'] || 0) >= 30) opportunities.push('Mevcut binalarda yeşil çatı ve duvar uygulaması potansiyeli var');
+  opportunities.push('Düşük yoğunluklu boşluklara cep park eklemeleri anlık soğutma odakları oluşturabilir');
+  if (morphologyRisk >= 50) opportunities.push('Rüzgar koridoru analizi havalandırma iyileştirme noktalarını belirleyebilir');
 
   // Threats
-  if (surfaceHeatLoad >= 60) threats.push('Risk of thermal discomfort during heat waves in pedestrian zones');
-  if (morphologyRisk >= 55) threats.push('Nocturnal heat retention from dense built mass');
-  if ((categoryBreakdown['impervious'] || 0) >= 35) threats.push('Low permeability increases combined flood and heat risk during storms');
-  threats.push('Progressive loss of green cover under development pressure may worsen UHI');
-  if (input.uhiScore >= 60) threats.push('Increasing urban heat may reduce outdoor usability without intervention');
+  if (surfaceHeatLoad >= 60) threats.push('Yaya bölgelerinde ısı dalgası döneminde termal konfor riski yüksek');
+  if (morphologyRisk >= 55) threats.push('Yoğun yapı kütlesi gece ısı tutarak kentsel ısı adasını güçlendiriyor');
+  if ((categoryBreakdown['impervious'] || 0) >= 35) threats.push('Düşük geçirgenlik yağmur döneminde hem sel hem ısı riskini artırıyor');
+  threats.push('Yapılaşma baskısıyla yeşil örtünün giderek azalması UHI\'yı daha da kötüleştirebilir');
+  if (input.uhiScore >= 60) threats.push('Artan kentsel ısı, müdahale olmadan açık alan kullanımını kısıtlayabilir');
 
   return { strengths, weaknesses, opportunities, threats };
 }
