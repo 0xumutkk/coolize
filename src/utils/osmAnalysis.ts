@@ -327,14 +327,49 @@ export async function analyzeArea(area: AnalysisArea): Promise<AnalysisResult> {
     keyAreas[f.key] = (keyAreas[f.key] || 0) + f.areaDeg2;
   }
 
-  // Uncovered area (roads/buildings often don't fill bbox): assume default semi-impervious
-  const coveredRatio = Math.min(features.reduce((s, f) => s + f.areaDeg2, 0) / bboxArea, 1);
-  const uncovered = 1 - coveredRatio;
+  // Uncovered area: OSM doesn't tag every surface. Instead of dumping everything
+  // into 'unknown', infer the likely surface type from the detected context.
+  const rawFeatureSum = features.reduce((s, f) => s + f.areaDeg2, 0);
+  const coveredRatio  = Math.min(rawFeatureSum / bboxArea, 1);
+  const uncovered     = 1 - coveredRatio;
+
   if (uncovered > 0) {
-    heatLoadSum += 0.50 * uncovered;
-    coolingSum += 0.20 * uncovered;
-    morphSum += 0.10 * uncovered;
-    categoryAreas['unknown'] = (categoryAreas['unknown'] || 0) + uncovered * bboxArea;
+    // Context-aware default: look at what IS identified to guess the gap.
+    const identifiedBuilding   = (categoryAreas['building']   || 0) / Math.max(rawFeatureSum, 1);
+    const identifiedImpervious = (categoryAreas['impervious'] || 0) / Math.max(rawFeatureSum, 1);
+    const identifiedVegetation = (categoryAreas['vegetation'] || 0) / Math.max(rawFeatureSum, 1);
+    const identifiedWater      = (categoryAreas['water']      || 0) / Math.max(rawFeatureSum, 1);
+
+    // In urban areas (>30% built environment) untagged gaps are mostly hard
+    // surfaces (sidewalks, courtyards, small alleys) — treat as semi-impervious.
+    // In green areas (>30% vegetation) untagged gaps lean toward grass/soil.
+    const urbanRatio = identifiedBuilding + identifiedImpervious;
+    const greenRatio = identifiedVegetation + identifiedWater;
+
+    let gapHeatLoad: number, gapCooling: number, gapMorph: number;
+    let gapCategory: string;
+
+    let gapKey: string;
+    if (urbanRatio >= 0.30) {
+      // Urban gap → sidewalks, courtyards, small alleys → paving
+      gapHeatLoad = 0.68; gapCooling = 0.08; gapMorph = 0.12;
+      gapCategory = 'semi_perm'; gapKey = 'surface_paving';
+    } else if (greenRatio >= 0.30) {
+      // Green-dominant gap → grass / soil
+      gapHeatLoad = 0.18; gapCooling = 0.42; gapMorph = 0.00;
+      gapCategory = 'semi_perm'; gapKey = 'surface_grass';
+    } else {
+      // Mixed/neutral → unpaved
+      gapHeatLoad = 0.45; gapCooling = 0.20; gapMorph = 0.08;
+      gapCategory = 'semi_perm'; gapKey = 'surface_unpaved';
+    }
+
+    heatLoadSum += gapHeatLoad * uncovered;
+    coolingSum  += gapCooling  * uncovered;
+    morphSum    += gapMorph    * uncovered;
+    // Write to BOTH categoryAreas AND keyAreas so keyBreakdown picks it up
+    categoryAreas[gapCategory] = (categoryAreas[gapCategory] || 0) + uncovered * bboxArea;
+    keyAreas[gapKey]            = (keyAreas[gapKey]            || 0) + uncovered * bboxArea;
   }
 
   // Normalisation denominator — used for both sub-scores and display breakdown.

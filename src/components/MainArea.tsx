@@ -281,33 +281,37 @@ const QAFullscreenOverlay: React.FC<QAFullscreenOverlayProps> = ({
 };
 
 // ─── Material category definitions ───────────────────────────────────────────
+// "Bina" is NOT a surface material — building footprints are remapped to
+// concrete/asphalt since their rooftop and base surfaces are hard impervious.
 interface MatMeta { label: string; color: string }
 const MATERIAL_CATEGORY_META: Record<string, MatMeta> = {
-  building:      { label: 'Bina',                color: '#334155' },
-  asphalt:       { label: 'Asfalt',              color: '#1e293b' },
-  concrete:      { label: 'Beton / Granit',      color: '#64748b' },
-  permeable:     { label: 'Geçirgen Taş / Çakıl', color: '#78716c' },
-  dense_tree:    { label: 'Ağaç (yoğun)',        color: '#15803d' },
-  light_tree:    { label: 'Ağaç (hafif)',         color: '#4d7c0f' },
-  grass:         { label: 'Çim / Çayırlık',      color: '#16a34a' },
-  soil:          { label: 'Toprak / Kum',         color: '#92400e' },
-  water:         { label: 'Su',                   color: '#0369a1' },
-  unknown:       { label: 'Sınıflandırılmamış',  color: '#94a3b8' },
+  asphalt:    { label: 'Asfalt',               color: '#1e293b' },
+  concrete:   { label: 'Beton / Sert Zemin',   color: '#64748b' },
+  permeable:  { label: 'Geçirgen Taş / Çakıl', color: '#78716c' },
+  dense_tree: { label: 'Ağaç (yoğun)',         color: '#15803d' },
+  light_tree: { label: 'Ağaç (hafif)',          color: '#4d7c0f' },
+  grass:      { label: 'Çim / Çayırlık',       color: '#16a34a' },
+  soil:       { label: 'Toprak / Kum',          color: '#92400e' },
+  water:      { label: 'Su',                    color: '#0369a1' },
+  unknown:    { label: 'Sınıflandırılmamış',   color: '#94a3b8' },
 };
 
-// All material types in display order (matches screenshot)
 const MATERIAL_ORDER = [
-  'building', 'asphalt', 'concrete', 'permeable',
+  'asphalt', 'concrete', 'permeable',
   'dense_tree', 'light_tree', 'grass', 'soil', 'water', 'unknown',
 ];
 
 // OSM key → material category
+// Buildings → concrete (hard impervious roof/base surface)
+// Commercial/industrial landuse → asphalt (mix of paved surfaces around buildings)
 const KEY_TO_MATERIAL: Record<string, string> = {
-  building:            'building',
-  landuse_commercial:  'building',
-  landuse_industrial:  'building',
-  landuse_retail:      'building',
-  landuse_residential: 'building',
+  // Building footprints → treated as concrete surface
+  building:            'concrete',
+  landuse_commercial:  'asphalt',
+  landuse_industrial:  'asphalt',
+  landuse_retail:      'asphalt',
+  landuse_residential: 'concrete',
+  // Roads → asphalt
   highway_primary:     'asphalt',
   highway_secondary:   'asphalt',
   highway_tertiary:    'asphalt',
@@ -315,28 +319,35 @@ const KEY_TO_MATERIAL: Record<string, string> = {
   highway_service:     'asphalt',
   landuse_parking:     'asphalt',
   surface_asphalt:     'asphalt',
+  // Concrete/hard surfaces
   surface_concrete:    'concrete',
+  // Permeable hard surfaces
   highway_footway:     'permeable',
   surface_paving:      'permeable',
   surface_gravel:      'permeable',
   surface_wood_deck:   'permeable',
   surface_unpaved:     'permeable',
+  // Dense tree canopy
   landuse_forest:      'dense_tree',
   natural_wood:        'dense_tree',
   tree_deciduous:      'dense_tree',
   tree_evergreen:      'dense_tree',
   tree_mixed:          'dense_tree',
+  // Light vegetation
   natural_tree:        'light_tree',
   natural_scrub:       'light_tree',
   leisure_park:        'light_tree',
   leisure_garden:      'light_tree',
+  // Grass
   leisure_pitch:       'grass',
   landuse_grass:       'grass',
   landuse_meadow:      'grass',
   natural_grassland:   'grass',
   surface_grass:       'grass',
+  // Soil
   surface_dirt:        'soil',
   surface_sand:        'soil',
+  // Water
   natural_water:       'water',
   natural_wetland:     'water',
   waterway_river:      'water',
@@ -357,12 +368,32 @@ function computeMaterialBreakdown(
     const mat = KEY_TO_MATERIAL[key] ?? 'unknown';
     out[mat] = (out[mat] ?? 0) + pct;
   }
-  // Unclassified area comes from categoryBreakdown 'unknown'
+
+  // Only keep genuine 'unknown' from categoryBreakdown (now much smaller
+  // after the context-aware gap-fill in osmAnalysis).
   if (categoryBreakdown['unknown']) {
     out['unknown'] = Math.max(out['unknown'], categoryBreakdown['unknown']);
   }
+
+  // If residual unknown is still >5%, redistribute it proportionally
+  // among detected categories (OSM tag gap, not truly unknown land type).
+  const unknownPct = out['unknown'];
+  if (unknownPct > 5) {
+    const detectedTotal = MATERIAL_ORDER
+      .filter(m => m !== 'unknown')
+      .reduce((s, m) => s + out[m], 0);
+    if (detectedTotal > 0) {
+      for (const mat of MATERIAL_ORDER) {
+        if (mat !== 'unknown') {
+          out[mat] += unknownPct * (out[mat] / detectedTotal);
+        }
+      }
+      out['unknown'] = 0;
+    }
+  }
+
   // Cap each at 100
-  for (const mat of MATERIAL_ORDER) out[mat] = Math.min(out[mat], 100);
+  for (const mat of MATERIAL_ORDER) out[mat] = Math.min(Math.round(out[mat] * 10) / 10, 100);
   return out;
 }
 
