@@ -151,68 +151,68 @@ function polyToBBox(points: Array<{ lat: number; lon: number }>): BBox {
 
 const TREE_NODE_AREA_DEG2 = 0.000000028; // ~25m² canopy proxy in degrees²
 
-/** Wraps fetch with a hard Promise.race timeout — reliable across all environments. */
-function fetchWithTimeout(url: string, ms: number): Promise<Response> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), ms);
+/** Calls the /api/overpass Vercel proxy (avoids CORS issues in production).
+ *  Falls back to a direct Overpass request for local dev where the proxy isn't running. */
+async function fetchOSMData(query: string): Promise<any> {
+  // In production, always use the server-side proxy
+  const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
-  const timeoutGuard = new Promise<never>((_, reject) =>
-    setTimeout(() => reject(new Error(`timeout after ${ms}ms`)), ms + 500)
-  );
+  if (!isLocalDev) {
+    // Production: route through Vercel serverless function
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 35_000);
+    try {
+      const res = await fetch('/api/overpass', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query }),
+        signal: ctrl.signal,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.error ?? `Proxy error ${res.status}`);
+      }
+      return await res.json();
+    } catch (err: any) {
+      const isAbort = err?.name === 'AbortError' || err?.message?.includes('abort');
+      if (isAbort) throw new Error('Request timed out. Try again or draw a smaller area.');
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
 
-  return Promise.race([
-    fetch(url, { signal: controller.signal }),
-    timeoutGuard,
-  ]).finally(() => clearTimeout(timer)) as Promise<Response>;
+  // Local dev: call Overpass directly (no CORS issue on localhost)
+  const ENDPOINTS = [
+    'https://overpass-api.de/api/interpreter',
+    'https://overpass.kumi.systems/api/interpreter',
+  ];
+  let lastErr: unknown;
+  for (const base of ENDPOINTS) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 30_000);
+    try {
+      const res = await Promise.race([
+        fetch(`${base}?data=${encodeURIComponent(query)}`, { signal: ctrl.signal }),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 31_000)),
+      ]) as Response;
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    } catch (err) {
+      lastErr = err;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  throw lastErr ?? new Error('All Overpass endpoints failed');
 }
-
-const OVERPASS_ENDPOINTS = [
-  'https://overpass-api.de/api/interpreter',
-  'https://overpass.kumi.systems/api/interpreter',
-];
-const FETCH_TIMEOUT_MS = 28_000; // 28 s per attempt
 
 export async function analyzeArea(area: AnalysisArea): Promise<AnalysisResult> {
   const query = buildOverpassQuery(area);
   // Bounding box for area calculations
   const bbox: BBox = isBBox(area) ? area : polyToBBox(area.points);
 
-  let response: Response | null = null;
-  let lastErr: unknown;
-
-  for (const base of OVERPASS_ENDPOINTS) {
-    const url = `${base}?data=${encodeURIComponent(query)}`;
-    try {
-      console.log(`[Narch] Trying Overpass endpoint: ${base}`);
-      const r = await fetchWithTimeout(url, FETCH_TIMEOUT_MS);
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      response = r;
-      break; // success — stop trying
-    } catch (err: any) {
-      console.warn(`[Narch] Endpoint failed (${base}):`, err?.message ?? err);
-      lastErr = err;
-    }
-  }
-
-  if (!response) {
-    throw new Error(
-      (lastErr as any)?.message?.includes('timeout')
-        ? 'Request timed out. Try again or draw a smaller area.'
-        : 'Could not reach OpenStreetMap data service. Check your internet connection.'
-    );
-  }
-
-  let data: any;
-  try {
-    data = await Promise.race([
-      response.json(),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('JSON parse timeout')), 10_000)
-      ),
-    ]);
-  } catch {
-    throw new Error('Failed to parse OSM response. Try again.');
-  }
+  const data = await fetchOSMData(query);
   const elements: any[] = data.elements || [];
 
   const bboxArea = (bbox.north - bbox.south) * (bbox.east - bbox.west);
