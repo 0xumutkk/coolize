@@ -57,11 +57,53 @@ const HIGHWAY_WIDTHS_DEG: Record<string, number> = {
   highway_footway:     0.000018,
 };
 
+// ── Surface material helpers ──────────────────────────────────────────────────
+const ASPHALT_SURFACES   = new Set(['asphalt', 'tar', 'chipseal', 'bituminous']);
+const CONCRETE_SURFACES  = new Set(['concrete', 'concrete:lanes', 'concrete:plates']);
+const PAVING_SURFACES    = new Set(['paving_stones', 'cobblestone', 'sett', 'unhewn_cobblestone', 'bricks']);
+const GRAVEL_SURFACES    = new Set(['gravel', 'fine_gravel', 'compacted', 'pebblestone', 'crushed_limestone']);
+const GRASS_SURFACES     = new Set(['grass', 'ground', 'earth', 'mud', 'turf']);
+const DIRT_SURFACES      = new Set(['dirt', 'soil', 'clay']);
+const SAND_SURFACES      = new Set(['sand']);
+const WOOD_SURFACES      = new Set(['wood', 'woodchips', 'boardwalk']);
+const UNPAVED_SURFACES   = new Set(['unpaved', 'grass_paver', 'stepping_stones']);
+
+function classifySurface(s: string): string | null {
+  if (ASPHALT_SURFACES.has(s))  return 'surface_asphalt';
+  if (CONCRETE_SURFACES.has(s)) return 'surface_concrete';
+  if (PAVING_SURFACES.has(s))   return 'surface_paving';
+  if (GRAVEL_SURFACES.has(s))   return 'surface_gravel';
+  if (GRASS_SURFACES.has(s))    return 'surface_grass';
+  if (DIRT_SURFACES.has(s))     return 'surface_dirt';
+  if (SAND_SURFACES.has(s))     return 'surface_sand';
+  if (WOOD_SURFACES.has(s))     return 'surface_wood_deck';
+  if (UNPAVED_SURFACES.has(s))  return 'surface_unpaved';
+  return null;
+}
+
+function classifyTreeNode(tags: Record<string, string>): string {
+  const lt = tags.leaf_type;
+  const lc = tags.leaf_cycle;
+  if (lc === 'deciduous' || lt === 'broadleaved') return 'tree_deciduous';
+  if (lc === 'evergreen' || lt === 'needleleaved') return 'tree_evergreen';
+  if (lt === 'mixed' || lc === 'semi_evergreen')  return 'tree_mixed';
+  return 'natural_tree';
+}
+
 function classifyElement(tags: Record<string, string>): string {
+  // 1. Buildings always win
   if (tags.building && tags.building !== 'no') return 'building';
 
+  // 2. Highway — use surface tag for material accuracy when available
   if (tags.highway) {
     const h = tags.highway;
+    const surf = tags.surface ? classifySurface(tags.surface) : null;
+
+    // If surface says it's soft/permeable, trust that over road class
+    if (surf === 'surface_grass' || surf === 'surface_dirt' || surf === 'surface_unpaved') return surf;
+    if (surf === 'surface_gravel' || surf === 'surface_sand') return surf;
+
+    // For hard-surfaced or unknown, classify by road importance (implies asphalt)
     if (['motorway', 'trunk', 'primary'].includes(h)) return 'highway_primary';
     if (h === 'secondary') return 'highway_secondary';
     if (h === 'tertiary') return 'highway_tertiary';
@@ -70,6 +112,7 @@ function classifyElement(tags: Record<string, string>): string {
     return 'highway_service';
   }
 
+  // 3. Landuse
   if (tags.landuse) {
     const lu = tags.landuse;
     if (lu === 'forest') return 'landuse_forest';
@@ -83,16 +126,25 @@ function classifyElement(tags: Record<string, string>): string {
     if (['park', 'recreation_ground', 'greenfield'].includes(lu)) return 'leisure_park';
   }
 
+  // 4. Natural features — tree nodes get leaf-type detail
   if (tags.natural) {
     const n = tags.natural;
-    if (n === 'tree') return 'natural_tree';
-    if (n === 'wood' || n === 'scrubland') return 'natural_wood';
+    if (n === 'tree') return classifyTreeNode(tags);
+    if (n === 'wood' || n === 'scrubland') {
+      // Forest polygons: use leaf type if available
+      const lt = tags.leaf_type;
+      const lc = tags.leaf_cycle;
+      if (lc === 'deciduous' || lt === 'broadleaved') return 'tree_deciduous';
+      if (lc === 'evergreen' || lt === 'needleleaved') return 'tree_evergreen';
+      return 'natural_wood';
+    }
     if (n === 'scrub') return 'natural_scrub';
     if (n === 'grassland' || n === 'heath') return 'natural_grassland';
     if (n === 'water') return 'natural_water';
     if (n === 'wetland') return 'natural_wetland';
   }
 
+  // 5. Leisure
   if (tags.leisure) {
     const l = tags.leisure;
     if (l === 'park' || l === 'nature_reserve') return 'leisure_park';
@@ -100,10 +152,17 @@ function classifyElement(tags: Record<string, string>): string {
     if (l === 'pitch' || l === 'sports_centre') return 'leisure_pitch';
   }
 
+  // 6. Waterway
   if (tags.waterway) {
     const w = tags.waterway;
     if (w === 'river') return 'waterway_river';
     if (['stream', 'canal', 'drain', 'ditch'].includes(w)) return 'waterway_stream';
+  }
+
+  // 7. Standalone surface=* areas (no other primary tag matched above)
+  if (tags.surface) {
+    const surf = classifySurface(tags.surface);
+    if (surf) return surf;
   }
 
   return 'default';
@@ -134,6 +193,7 @@ function buildOverpassQuery(area: AnalysisArea): string {
   way["natural"]["natural"!="tree"]${spatial};
   way["leisure"]${spatial};
   way["waterway"]${spatial};
+  way["surface"]${spatial};
   node["natural"="tree"]${spatial};
   node["amenity"="parking"]${spatial};
 );

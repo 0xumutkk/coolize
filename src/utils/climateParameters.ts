@@ -39,6 +39,24 @@ export const OSM_PARAMETER_MAP: Record<string, FeatureParams> = {
   waterway_stream:      { heatLoad: 0.20, coolingPotential: 0.45, morphologyImpact: 0.00, category: 'water' },
   waterway_canal:       { heatLoad: 0.20, coolingPotential: 0.45, morphologyImpact: 0.00, category: 'water' },
 
+  // ── Surface material types (from OSM surface=* tag) ──────────────────────────
+  // Dark impervious — highest heat load
+  surface_asphalt:      { heatLoad: 0.93, coolingPotential: 0.02, morphologyImpact: 0.05, category: 'impervious' },
+  surface_concrete:     { heatLoad: 0.80, coolingPotential: 0.05, morphologyImpact: 0.05, category: 'impervious' },
+  // Semi-permeable hard surfaces
+  surface_paving:       { heatLoad: 0.65, coolingPotential: 0.10, morphologyImpact: 0.03, category: 'semi_perm' },
+  surface_gravel:       { heatLoad: 0.38, coolingPotential: 0.22, morphologyImpact: 0.00, category: 'semi_perm' },
+  surface_sand:         { heatLoad: 0.30, coolingPotential: 0.18, morphologyImpact: 0.00, category: 'semi_perm' },
+  surface_unpaved:      { heatLoad: 0.28, coolingPotential: 0.25, morphologyImpact: 0.00, category: 'semi_perm' },
+  surface_wood_deck:    { heatLoad: 0.42, coolingPotential: 0.15, morphologyImpact: 0.00, category: 'semi_perm' },
+  // Soft / vegetation-type surfaces
+  surface_grass:        { heatLoad: 0.10, coolingPotential: 0.55, morphologyImpact: 0.00, category: 'vegetation' },
+  surface_dirt:         { heatLoad: 0.20, coolingPotential: 0.30, morphologyImpact: 0.00, category: 'semi_perm' },
+  // Tree detail types (from leaf_type / leaf_cycle tags)
+  tree_deciduous:       { heatLoad: 0.05, coolingPotential: 0.90, morphologyImpact: 0.00, category: 'vegetation' },
+  tree_evergreen:       { heatLoad: 0.05, coolingPotential: 0.85, morphologyImpact: 0.00, category: 'vegetation' },
+  tree_mixed:           { heatLoad: 0.05, coolingPotential: 0.87, morphologyImpact: 0.00, category: 'vegetation' },
+
   default:              { heatLoad: 0.50, coolingPotential: 0.20, morphologyImpact: 0.20, category: 'unknown' },
 };
 

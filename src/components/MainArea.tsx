@@ -280,50 +280,91 @@ const QAFullscreenOverlay: React.FC<QAFullscreenOverlayProps> = ({
   );
 };
 
-const CATEGORY_LABELS: Record<string, { label: string; color: string }> = {
-  building:   { label: 'Buildings',      color: '#334155' },
-  impervious: { label: 'Roads & Paved',  color: '#64748b' },
-  semi_perm:  { label: 'Semi-Permeable', color: '#84cc16' },
-  vegetation: { label: 'Green Areas',    color: '#22c55e' },
-  water:      { label: 'Water Bodies',   color: '#0ea5e9' },
-  unknown:    { label: 'Unclassified',   color: '#94a3b8' },
+// ─── Material category definitions ───────────────────────────────────────────
+interface MatMeta { label: string; color: string }
+const MATERIAL_CATEGORY_META: Record<string, MatMeta> = {
+  building:      { label: 'Bina',                color: '#334155' },
+  asphalt:       { label: 'Asfalt',              color: '#1e293b' },
+  concrete:      { label: 'Beton / Granit',      color: '#64748b' },
+  permeable:     { label: 'Geçirgen Taş / Çakıl', color: '#78716c' },
+  dense_tree:    { label: 'Ağaç (yoğun)',        color: '#15803d' },
+  light_tree:    { label: 'Ağaç (hafif)',         color: '#4d7c0f' },
+  grass:         { label: 'Çim / Çayırlık',      color: '#16a34a' },
+  soil:          { label: 'Toprak / Kum',         color: '#92400e' },
+  water:         { label: 'Su',                   color: '#0369a1' },
+  unknown:       { label: 'Sınıflandırılmamış',  color: '#94a3b8' },
 };
 
-const OSM_KEY_LABELS: Record<string, string> = {
-  building:            'Buildings',
-  highway_primary:     'Primary Road',
-  highway_secondary:   'Secondary Road',
-  highway_tertiary:    'Tertiary Road',
-  highway_residential: 'Residential Road',
-  highway_service:     'Service Road',
-  highway_footway:     'Footway / Path',
-  landuse_forest:      'Forest',
-  landuse_grass:       'Grass',
-  landuse_meadow:      'Meadow',
-  landuse_commercial:  'Commercial Area',
-  landuse_industrial:  'Industrial Area',
-  landuse_retail:      'Retail Area',
-  landuse_residential: 'Residential Area',
-  landuse_parking:     'Parking Lot',
-  natural_tree:        'Urban Trees',
-  natural_wood:        'Woodland',
-  natural_scrub:       'Scrubland',
-  natural_grassland:   'Grassland',
-  natural_water:       'Open Water',
-  natural_wetland:     'Wetland',
-  leisure_park:        'Park / Reserve',
-  leisure_garden:      'Garden',
-  leisure_pitch:       'Sports Pitch',
-  waterway_river:      'River',
-  waterway_stream:     'Stream / Canal',
-  waterway_canal:      'Canal',
-  default:             'Unclassified',
+// All material types in display order (matches screenshot)
+const MATERIAL_ORDER = [
+  'building', 'asphalt', 'concrete', 'permeable',
+  'dense_tree', 'light_tree', 'grass', 'soil', 'water', 'unknown',
+];
+
+// OSM key → material category
+const KEY_TO_MATERIAL: Record<string, string> = {
+  building:            'building',
+  landuse_commercial:  'building',
+  landuse_industrial:  'building',
+  landuse_retail:      'building',
+  landuse_residential: 'building',
+  highway_primary:     'asphalt',
+  highway_secondary:   'asphalt',
+  highway_tertiary:    'asphalt',
+  highway_residential: 'asphalt',
+  highway_service:     'asphalt',
+  landuse_parking:     'asphalt',
+  surface_asphalt:     'asphalt',
+  surface_concrete:    'concrete',
+  highway_footway:     'permeable',
+  surface_paving:      'permeable',
+  surface_gravel:      'permeable',
+  surface_wood_deck:   'permeable',
+  surface_unpaved:     'permeable',
+  landuse_forest:      'dense_tree',
+  natural_wood:        'dense_tree',
+  tree_deciduous:      'dense_tree',
+  tree_evergreen:      'dense_tree',
+  tree_mixed:          'dense_tree',
+  natural_tree:        'light_tree',
+  natural_scrub:       'light_tree',
+  leisure_park:        'light_tree',
+  leisure_garden:      'light_tree',
+  leisure_pitch:       'grass',
+  landuse_grass:       'grass',
+  landuse_meadow:      'grass',
+  natural_grassland:   'grass',
+  surface_grass:       'grass',
+  surface_dirt:        'soil',
+  surface_sand:        'soil',
+  natural_water:       'water',
+  natural_wetland:     'water',
+  waterway_river:      'water',
+  waterway_stream:     'water',
+  waterway_canal:      'water',
+  default:             'unknown',
 };
 
-// Map OSM key → category
-const KEY_TO_CATEGORY: Record<string, string> = Object.fromEntries(
-  Object.entries(OSM_PARAMETER_MAP).map(([k, v]) => [k, v.category])
-);
+/** Aggregate keyBreakdown percentages into material categories. */
+function computeMaterialBreakdown(
+  keyBreakdown: Record<string, number>,
+  categoryBreakdown: Record<string, number>,
+): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const mat of MATERIAL_ORDER) out[mat] = 0;
+
+  for (const [key, pct] of Object.entries(keyBreakdown)) {
+    const mat = KEY_TO_MATERIAL[key] ?? 'unknown';
+    out[mat] = (out[mat] ?? 0) + pct;
+  }
+  // Unclassified area comes from categoryBreakdown 'unknown'
+  if (categoryBreakdown['unknown']) {
+    out['unknown'] = Math.max(out['unknown'], categoryBreakdown['unknown']);
+  }
+  // Cap each at 100
+  for (const mat of MATERIAL_ORDER) out[mat] = Math.min(out[mat], 100);
+  return out;
+}
 
 const SUB_SCORE_META: Record<string, { label: string; higherIsBetter: boolean }> = {
   surfaceHeatLoad:       { label: 'Surface Heat Load',    higherIsBetter: false },
@@ -709,8 +750,6 @@ interface QAPercentsPanelProps {
 const QAPercentsPanel: React.FC<QAPercentsPanelProps> = ({
   result, isAnalyzing, drawState, drawMode, polyPointCount, error, onAnalyze, onReset,
 }) => {
-  const [expandedCat, setExpandedCat] = useState<string | null>(null);
-
   const drawHint = drawMode === null
     ? 'Select Rect or Poly to begin drawing'
     : drawMode === 'rect'
@@ -722,110 +761,53 @@ const QAPercentsPanel: React.FC<QAPercentsPanelProps> = ({
         : polyPointCount < 3          ? `${polyPointCount} pts — add ${3 - polyPointCount} more`
         : `${polyPointCount} pts — click 1st vertex or dbl-click to close`);
 
+  const matBreakdown = result
+    ? computeMaterialBreakdown(result.keyBreakdown, result.categoryBreakdown)
+    : null;
+
   return (
     <div id="percentsPanel">
-      <h3>OSM Surface Scan</h3>
+      <h3>Surface Distribution</h3>
 
       {/* Draw instructions */}
       <div className="qa-draw-hint-bar">
         <span className="qa-draw-hint-text">{drawHint}</span>
       </div>
 
-      {/* Breakdown table */}
-      {result ? (
-        <div className="percents-table-wrapper">
-          <table>
-            <thead><tr><th>Category</th><th>%</th></tr></thead>
-            <tbody>
-              {Object.entries(result.categoryBreakdown)
-                .filter(([, pct]) => pct > 0)
-                .sort(([, a], [, b]) => b - a)
-                .map(([cat, pct]) => {
-                  const meta = CATEGORY_LABELS[cat] ?? { label: cat, color: '#94a3b8' };
-                  const isOpen = expandedCat === cat;
-                  const subKeys = Object.entries(result.keyBreakdown)
-                    .filter(([k, p]) => p > 0 && (KEY_TO_CATEGORY[k] === cat || (cat === 'unknown' && !KEY_TO_CATEGORY[k])))
-                    .sort(([, a], [, b]) => b - a);
-                  const hasDetail = subKeys.length > 0;
-                  return (
-                    <React.Fragment key={cat}>
-                      <tr
-                        className={hasDetail ? 'qa-cat-row qa-cat-row--clickable' : 'qa-cat-row'}
-                        onClick={() => hasDetail && setExpandedCat(isOpen ? null : cat)}
-                      >
-                        <td>
-                          <span className="qa-cat-dot" style={{ background: meta.color }} />
-                          {meta.label}
-                          {hasDetail && (
-                            <span className="qa-expand-icon">{isOpen ? '▾' : '▸'}</span>
-                          )}
-                        </td>
-                        <td><strong>{Math.min(pct, 100)}%</strong></td>
-                      </tr>
-                      {isOpen && subKeys.map(([k, p]) => {
-                        const params = OSM_PARAMETER_MAP[k];
-                        return (
-                          <tr key={k} className="qa-subkey-row">
-                            <td colSpan={2}>
-                              <div className="qa-subkey-content">
-                                <div className="qa-subkey-header">
-                                  <span className="qa-subkey-indent" />
-                                  <span className="qa-subkey-name">{OSM_KEY_LABELS[k] ?? k}</span>
-                                  <span className="qa-subkey-pct">{p}%</span>
-                                </div>
-                                {params && (
-                                  <div className="qa-subkey-params">
-                                    <div className="qa-param-row">
-                                      <span className="qa-param-label">Heat Load</span>
-                                      <div className="qa-param-bar-track">
-                                        <div
-                                          className="qa-param-bar-fill qa-param-bar--heat"
-                                          style={{ width: `${params.heatLoad * 100}%` }}
-                                        />
-                                      </div>
-                                      <span className="qa-param-val">{Math.round(params.heatLoad * 100)}</span>
-                                    </div>
-                                    <div className="qa-param-row">
-                                      <span className="qa-param-label">Cooling</span>
-                                      <div className="qa-param-bar-track">
-                                        <div
-                                          className="qa-param-bar-fill qa-param-bar--cool"
-                                          style={{ width: `${params.coolingPotential * 100}%` }}
-                                        />
-                                      </div>
-                                      <span className="qa-param-val">{Math.round(params.coolingPotential * 100)}</span>
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </React.Fragment>
-                  );
-                })}
-            </tbody>
-          </table>
-          <p className="qa-feature-note">{result.featureCount} OSM features</p>
-        </div>
-      ) : isAnalyzing ? (
+      {/* Material breakdown table */}
+      {isAnalyzing ? (
         <div className="qa-empty-table">
           <div className="qa-spinner-sm" /><p>Fetching OSM data…</p>
         </div>
       ) : (
         <div className="percents-table-wrapper">
-          <table className="sk-table">
-            <thead><tr><th>Category</th><th>%</th></tr></thead>
+          <table>
+            <thead>
+              <tr><th>Yüzey Türü</th><th>Yüzde</th></tr>
+            </thead>
             <tbody>
-              {SK_WIDTHS.map((w, i) => (
-                <tr key={i} className="sk-row">
-                  <td><div className="sk-line" style={{ height: 10, width: w }} /></td>
-                  <td style={{ width: 44 }}><div className="sk-line" style={{ height: 10, width: 32 }} /></td>
-                </tr>
-              ))}
+              {MATERIAL_ORDER.map(mat => {
+                const meta = MATERIAL_CATEGORY_META[mat];
+                const pct = matBreakdown ? Math.round(matBreakdown[mat]) : 0;
+                return (
+                  <tr key={mat}>
+                    <td>
+                      <span className="qa-cat-dot" style={{ background: meta.color }} />
+                      {meta.label}
+                    </td>
+                    <td>
+                      <strong className={pct > 0 ? 'qa-mat-pct--active' : 'qa-mat-pct--zero'}>
+                        {pct.toFixed(1)}%
+                      </strong>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
+          {result && (
+            <p className="qa-feature-note">{result.featureCount} OSM features</p>
+          )}
         </div>
       )}
 
