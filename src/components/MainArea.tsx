@@ -1112,10 +1112,7 @@ const MainArea: React.FC<MainAreaProps> = ({
       const res = await analyzeArea(analysisArea);
       setQaResult(res);
     } catch (err: any) {
-      const isAbort = err?.name === 'AbortError' || err?.message?.includes('timeout');
-      setQaError(isAbort
-        ? 'Request timed out. Try again or draw a smaller area.'
-        : 'Could not reach OpenStreetMap data service. Check your internet connection and try again.');
+      setQaError(err?.message ?? 'Analysis failed. Please try again.');
     } finally {
       setQaAnalyzing(false);
     }

@@ -151,40 +151,68 @@ function polyToBBox(points: Array<{ lat: number; lon: number }>): BBox {
 
 const TREE_NODE_AREA_DEG2 = 0.000000028; // ~25m² canopy proxy in degrees²
 
+/** Wraps fetch with a hard Promise.race timeout — reliable across all environments. */
+function fetchWithTimeout(url: string, ms: number): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+
+  const timeoutGuard = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error(`timeout after ${ms}ms`)), ms + 500)
+  );
+
+  return Promise.race([
+    fetch(url, { signal: controller.signal }),
+    timeoutGuard,
+  ]).finally(() => clearTimeout(timer)) as Promise<Response>;
+}
+
+const OVERPASS_ENDPOINTS = [
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+];
+const FETCH_TIMEOUT_MS = 28_000; // 28 s per attempt
+
 export async function analyzeArea(area: AnalysisArea): Promise<AnalysisResult> {
   const query = buildOverpassQuery(area);
   // Bounding box for area calculations
   const bbox: BBox = isBBox(area) ? area : polyToBBox(area.points);
-  const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 35000);
+  let response: Response | null = null;
+  let lastErr: unknown;
 
-  let response: Response;
-  try {
-    response = await fetch(url, { signal: controller.signal });
-  } catch (primaryErr: any) {
-    console.error('[Narch] Primary Overpass endpoint failed:', primaryErr?.message ?? primaryErr);
-    // Try fallback endpoint
-    const fallbackUrl = `https://overpass.kumi.systems/api/interpreter?data=${encodeURIComponent(query)}`;
-    const controller2 = new AbortController();
-    const timeoutId2 = setTimeout(() => controller2.abort(), 35000);
+  for (const base of OVERPASS_ENDPOINTS) {
+    const url = `${base}?data=${encodeURIComponent(query)}`;
     try {
-      console.log('[Narch] Trying fallback Overpass endpoint…');
-      response = await fetch(fallbackUrl, { signal: controller2.signal });
-    } catch (fallbackErr: any) {
-      console.error('[Narch] Fallback endpoint also failed:', fallbackErr?.message ?? fallbackErr);
-      throw fallbackErr;
-    } finally {
-      clearTimeout(timeoutId2);
+      console.log(`[Narch] Trying Overpass endpoint: ${base}`);
+      const r = await fetchWithTimeout(url, FETCH_TIMEOUT_MS);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      response = r;
+      break; // success — stop trying
+    } catch (err: any) {
+      console.warn(`[Narch] Endpoint failed (${base}):`, err?.message ?? err);
+      lastErr = err;
     }
-  } finally {
-    clearTimeout(timeoutId);
   }
 
-  if (!response!.ok) throw new Error(`Overpass API error: ${response!.status}`);
+  if (!response) {
+    throw new Error(
+      (lastErr as any)?.message?.includes('timeout')
+        ? 'Request timed out. Try again or draw a smaller area.'
+        : 'Could not reach OpenStreetMap data service. Check your internet connection.'
+    );
+  }
 
-  const data = await response.json();
+  let data: any;
+  try {
+    data = await Promise.race([
+      response.json(),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('JSON parse timeout')), 10_000)
+      ),
+    ]);
+  } catch {
+    throw new Error('Failed to parse OSM response. Try again.');
+  }
   const elements: any[] = data.elements || [];
 
   const bboxArea = (bbox.north - bbox.south) * (bbox.east - bbox.west);
