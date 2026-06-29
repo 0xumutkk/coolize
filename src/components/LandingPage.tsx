@@ -2,9 +2,10 @@ import React, { useRef, useState, useEffect } from 'react';
 
 interface LandingPageProps {
   onEnterApp: () => void;
+  onQuickAnalysis?: () => void;
 }
 
-const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
+const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp, onQuickAnalysis }) => {
   const carouselRef = useRef<HTMLDivElement>(null);
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -142,7 +143,10 @@ const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
             <h1 id="hero-title" className="hero-title">Microclimate Adaptation</h1>
             <p className="hero-description">
             Urban spaces are modeled using a layered, pixel-based approach to generate AI-driven microclimate scores; outdoor areas are analyzed through microclimate profiling, and nature-based strategies are proposed to mitigate the urban heat island effect and improve microclimatic performance.            </p>
-            <button className="hero-cta" onClick={onEnterApp}>Get Started</button>
+            <div className="hero-cta-group">
+              <button className="hero-cta" onClick={onEnterApp}>Get Started</button>
+              <button className="hero-cta-secondary" onClick={onQuickAnalysis}>Try Free Analysis →</button>
+            </div>
             <div className="scroll-hint">
               Scroll to see how Narch works ↓
             </div>

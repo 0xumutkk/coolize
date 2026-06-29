@@ -7,70 +7,40 @@ import MainArea from './components/MainArea';
 import TopNavbar from './components/TopNavbar';
 import { useGrid } from './hooks/useGrid';
 
-type SelectedLocation = {
-  name: string;
-  lat: number;
-  lon: number;
-} | null;
+type SelectedLocation = { name: string; lat: number; lon: number } | null;
 
 function App() {
   const [showApp, setShowApp] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<SelectedLocation>(null);
 
   useEffect(() => {
-    // Set initial body class
-    if (!showApp) {
-      document.body.classList.add('landing-active');
-    } else {
-      document.body.classList.remove('landing-active');
-    }
+    if (!showApp) document.body.classList.add('landing-active');
+    else document.body.classList.remove('landing-active');
   }, [showApp]);
 
   useEffect(() => {
-    // Set initial class on mount
     document.body.classList.add('landing-active');
-    return () => {
-      document.body.classList.remove('landing-active');
-    };
+    return () => { document.body.classList.remove('landing-active'); };
   }, []);
+
   const {
-    gridSize,
-    setGridSize,
-    gridClasses,
-    currentClass,
-    setCurrentClass,
-    isPainting,
-    setIsPainting,
-    baseImageSrc,
-    setBaseImageSrc,
-    gridCanvasRef,
-    baseImageRef,
-    fallbackCanvasRef,
-    paintAt,
-    updateStatsAndScores,
-    drawGridAndCells,
+    gridSize, setGridSize, gridClasses, currentClass, setCurrentClass,
+    isPainting, setIsPainting, baseImageSrc, setBaseImageSrc,
+    gridCanvasRef, baseImageRef, fallbackCanvasRef,
+    paintAt, updateStatsAndScores, drawGridAndCells,
   } = useGrid();
 
-  const handleEnterApp = () => {
-    setShowApp(true);
-  };
-
-  const handleLogout = () => {
-    setShowApp(false);
-  };
-
-  const handleMyWorks = () => {
-    // TODO: Implement my works functionality
-    console.log('My Works clicked');
-  };
-
   if (!showApp) {
-    return <LandingPage onEnterApp={handleEnterApp} />;
+    return <LandingPage onEnterApp={() => setShowApp(true)} />;
   }
+
+  const mapCenter: [number, number] = selectedLocation
+    ? [selectedLocation.lat, selectedLocation.lon]
+    : [41.015, 28.979];
 
   return (
     <div id="app-container">
-      <TopNavbar onLogout={handleLogout} onMyWorks={handleMyWorks} />
+      <TopNavbar onLogout={() => setShowApp(false)} onMyWorks={() => {}} />
       <div id="app-content">
         <Sidebar
           gridSize={gridSize}
@@ -98,6 +68,8 @@ function App() {
               ? `${selectedLocation.name} (${selectedLocation.lat.toFixed(3)}, ${selectedLocation.lon.toFixed(3)})`
               : 'No location set'
           }
+          mapCenter={mapCenter}
+          onLocationSelect={setSelectedLocation}
         />
       </div>
     </div>
