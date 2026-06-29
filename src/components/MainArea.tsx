@@ -8,7 +8,7 @@ import CoolStrategies from './CoolStrategies';
 import SaaSProducts from './SaaSProducts';
 import UHIBarometer from './UHIBarometer';
 import { analyzeArea, BBox, PolyArea, AnalysisResult } from '../utils/osmAnalysis';
-import { getRiskLevel, OSM_PARAMETER_MAP } from '../utils/climateParameters';
+import { getRiskLevel } from '../utils/climateParameters';
 
 type GridClass = keyof typeof CLASS_CONFIG;
 type GridArray = GridClass[][];
@@ -695,7 +695,6 @@ const PercentsPanel: React.FC<PercentsPanelProps> = ({ percents, calculateButton
   );
 };
 
-const SK_WIDTHS = ['85%', '60%', '72%', '48%', '65%'];
 
 // ─── QA Skeleton — scores panel ──────────────────────────────────────────────
 const SK_BARS = [
