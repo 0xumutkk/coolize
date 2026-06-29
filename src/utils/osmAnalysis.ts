@@ -653,13 +653,13 @@ function generateSWOT(input: SWOTInput) {
   if (buildingPct >= 30) weaknesses.push('Yapı/çatı yüzeyi oranı açık alan soğutma etkisini sınırlıyor');
 
   // Opportunities
-  if (hasOpenInstitutionalGreen) opportunities.push('Açık kampüs alanında mevcut yaya aksları gölgeli, geçirgen ve serin dinlenme cepleriyle yeniden düzenlenebilir');
-  if (pavingPct >= 15) opportunities.push('Sert kaplama yaya yüzeyleri açık renkli/doğal taş ve geçirgen derzlerle ısı yükü düşük hale getirilebilir');
-  if (loosePct >= 10) opportunities.push('Gevşek veya belirsiz zeminler stabilize geçirgen kaplama ile erişilebilir ama serin yüzeye dönüştürülebilir');
+  if (hasOpenInstitutionalGreen) opportunities.push('Açık kampüs alanındaki yaya aksları gölgeli, suyu geçiren ve serin oturma/dinlenme noktalarıyla yeniden düzenlenebilir');
+  if (pavingPct >= 15) opportunities.push('Sert kaplama yaya yüzeylerinde açık renkli doğal taş, geçirgen derz ve gölgeleme kullanılarak ısı yükü azaltılabilir');
+  if (loosePct >= 10) opportunities.push('Gevşek veya belirsiz zeminler sıkıştırılmış geçirgen yüzeylerle erişilebilir ve daha serin hale getirilebilir');
   if (treePct < 35 && vegetationPct >= 20) opportunities.push('Mevcut yeşil doku, yaya yolları boyunca gölge sürekliliği verecek ağaç kümeleriyle tamamlanabilir');
-  if (waterRegulation < 30) opportunities.push('Açık alanın düşük kotlu kenarlarında yağmur bahçesi, biyoswale veya sığ su öğeleri eklenebilir');
+  if (waterRegulation < 30) opportunities.push('Açık alanın düşük kotlu kenarlarında yağmur bahçesi, bitkilendirilmiş yağmur suyu hendeği veya sığ su öğeleri eklenebilir');
   if (buildingPct >= 30) opportunities.push('Mevcut binalarda yeşil çatı ve duvar uygulaması potansiyeli var');
-  if (!hasOpenInstitutionalGreen && morphologyRisk < 45) opportunities.push('Düşük yoğunluklu boşluklara cep park eklemeleri anlık soğutma odakları oluşturabilir');
+  if (!hasOpenInstitutionalGreen && morphologyRisk < 45) opportunities.push('Düşük yoğunluklu boşluklarda küçük gölgeli yeşil alanlar anlık serinleme odakları oluşturabilir');
   if (morphologyRisk >= 50) opportunities.push('Rüzgar koridoru analizi havalandırma iyileştirme noktalarını belirleyebilir');
 
   // Threats

@@ -903,9 +903,9 @@ const QAPercentsPanel: React.FC<QAPercentsPanelProps> = ({
 interface ScoresPanelProps { scores: ScoreData; isSummarizeOpen: boolean; onSummarizeToggle: () => void; }
 const ScoresPanel: React.FC<ScoresPanelProps> = ({ scores, isSummarizeOpen, onSummarizeToggle }) => {
   const visualAnalysis = {
-    strengths: ['Strong water management infrastructure', 'Good distribution of green spaces', 'Effective use of permeable materials'],
-    weaknesses: ['Limited canopy coverage in central areas', 'High concentration of sealed surfaces', 'Insufficient shade in pedestrian zones'],
-    opportunities: ['Potential for rooftop gardens', 'Space available for additional tree planting', 'Opportunity to retrofit existing buildings'],
+    strengths: ['Su yönetimi altyapısı güçlü', 'Yeşil alanlar dengeli dağılmış', 'Geçirgen yüzey kullanımı etkili'],
+    weaknesses: ['Merkezi alanlarda ağaç gölgesi sınırlı', 'Sert ve geçirimsiz yüzey yoğunluğu yüksek', 'Yaya bölgelerinde gölge yetersiz'],
+    opportunities: ['Yeşil çatı uygulamaları için potansiyel var', 'Ek ağaçlandırma için uygun boşluklar bulunuyor', 'Mevcut binalar iklim duyarlı iyileştirmelerle yenilenebilir'],
   };
   const labels: Record<string, string> = { NEI: 'Nature Integration', SWE: 'Water Management', HEAT: 'Heat Management', TCI: 'Thermal Comfort', BCI: 'Bioclimate', UCIS: 'Total Score' };
   const ucisScore = scores.UCIS;
