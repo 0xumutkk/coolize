@@ -145,7 +145,7 @@ const QALocationSearch: React.FC<{
       try {
         const r = await fetch(
           `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5`,
-          { headers: { 'Accept-Language': 'en' } }
+          { headers: { 'Accept-Language': 'tr' } }
         );
         const d: GeoResult[] = await r.json();
         setResults(d); setOpen(d.length > 0);
@@ -180,7 +180,7 @@ const QALocationSearch: React.FC<{
           <input
             type="text"
             className="qa-search-input"
-            placeholder="Search location…"
+            placeholder="Konum ara…"
             value={query}
             onChange={e => setQuery(e.target.value)}
             onFocus={() => results.length > 0 && setOpen(true)}
@@ -211,13 +211,13 @@ const QADrawModeControls: React.FC<{
     <button
       className={`qa-draw-mode-btn${drawMode === 'rect' ? ' active' : ''}`}
       onClick={() => onSetMode(drawMode === 'rect' ? null : 'rect')}
-      title="Rectangle — click two corners"
-    >▭ Rect</button>
+      title="Dikdörtgen — iki köşeye tıkla"
+    >▭ Dikdörtgen</button>
     <button
       className={`qa-draw-mode-btn${drawMode === 'poly' ? ' active' : ''}`}
       onClick={() => onSetMode(drawMode === 'poly' ? null : 'poly')}
-      title="Polygon — click vertices, dbl-click or click 1st point to close"
-    >⬡ Poly</button>
+      title="Çokgen — köşelere tıkla, çift tıkla veya 1. noktaya tıkla"
+    >⬡ Çokgen</button>
   </div>
 );
 
@@ -241,9 +241,9 @@ const QAFullscreenOverlay: React.FC<QAFullscreenOverlayProps> = ({
           disabled={isAnalyzing || drawState !== 'done'}
         >
           {isAnalyzing ? (
-            <><span className="qa-fs-spinner" />Analyzing…</>
+            <><span className="qa-fs-spinner" />Analiz ediliyor…</>
           ) : (
-            '⟳ Analyze Area'
+            '⟳ Alanı Analiz Et'
           )}
         </button>
       </div>
@@ -275,7 +275,7 @@ const QAFullscreenOverlay: React.FC<QAFullscreenOverlayProps> = ({
           );
         })}
       </div>
-      <button className="qa-fs-reset-btn" onClick={onReset}>↺ Reset</button>
+      <button className="qa-fs-reset-btn" onClick={onReset}>↺ Sıfırla</button>
     </div>
   );
 };
@@ -292,9 +292,10 @@ const MATERIAL_CATEGORY_META: Record<string, MatMeta> = {
   roof_metal:    { label: 'Metal Çatı',         color: '#9ca3af' },  // silver-gray
   roof_green:    { label: 'Yeşil Çatı',         color: '#166534' },  // deep green
   // ── Ground surfaces ─────────────────────────────────────────────────────────
-  asphalt:       { label: 'Asfalt',             color: '#1e293b' },
-  concrete:      { label: 'Beton Zemin',        color: '#64748b' },
-  permeable:     { label: 'Geçirgen Zemin',     color: '#78716c' },
+  asphalt:       { label: 'Asfalt',                   color: '#1e293b' },
+  concrete:      { label: 'Beton Zemin',              color: '#64748b' },
+  paving:        { label: 'Kaplama Taşı / Granit',    color: '#78716c' },
+  gravel:        { label: 'Çakıl / Gevşek Zemin',     color: '#b5a07a' },
   dense_tree:    { label: 'Ağaç (yoğun)',       color: '#15803d' },
   light_tree:    { label: 'Ağaç (hafif)',        color: '#4d7c0f' },
   grass:         { label: 'Çim / Çayırlık',     color: '#16a34a' },
@@ -414,11 +415,11 @@ function computeMaterialBreakdown(
 }
 
 const SUB_SCORE_META: Record<string, { label: string; higherIsBetter: boolean }> = {
-  surfaceHeatLoad:       { label: 'Surface Heat Load',    higherIsBetter: false },
-  vegetationCooling:     { label: 'Vegetation Cooling',   higherIsBetter: true },
-  waterRegulation:       { label: 'Water Regulation',     higherIsBetter: true },
-  morphologyRisk:        { label: 'Morphology Risk',      higherIsBetter: false },
-  anthropogenicPressure: { label: 'Urban Pressure',       higherIsBetter: false },
+  surfaceHeatLoad:       { label: 'Yüzey Isı Yükü',    higherIsBetter: false },
+  vegetationCooling:     { label: 'Bitki Soğutması',    higherIsBetter: true },
+  waterRegulation:       { label: 'Su Düzenlemesi',     higherIsBetter: true },
+  morphologyRisk:        { label: 'Morfoloji Riski',    higherIsBetter: false },
+  anthropogenicPressure: { label: 'Kentsel Baskı',      higherIsBetter: false },
 };
 
 // ─── CanvasArea ───────────────────────────────────────────────────────────────
@@ -749,7 +750,7 @@ const SK_BARS = [
 ];
 const QASkeletonScores: React.FC = () => (
   <div id="scoresPanel">
-    <h3>UHI Risk Score</h3>
+    <h3>UHI Risk Skoru</h3>
     <div id="ucisSpeedometer">
       <div className="speedometer-container">
         <div className="sk-speedometer" />
@@ -797,15 +798,15 @@ const QAPercentsPanel: React.FC<QAPercentsPanelProps> = ({
   result, isAnalyzing, drawState, drawMode, polyPointCount, error, onAnalyze, onReset,
 }) => {
   const drawHint = drawMode === null
-    ? 'Select Rect or Poly to begin drawing'
+    ? 'Çizime başlamak için Dikdörtgen veya Çokgen seçin'
     : drawMode === 'rect'
-      ? (drawState === 'idle'         ? 'Click map to set first corner'
-        : drawState === 'first_click' ? 'Click again to set second corner'
-        : 'Rectangle selected — click Analyze')
-      : (drawState === 'done'         ? `Polygon closed (${polyPointCount} pts) — click Analyze`
-        : polyPointCount === 0        ? 'Click to place first vertex'
-        : polyPointCount < 3          ? `${polyPointCount} pts — add ${3 - polyPointCount} more`
-        : `${polyPointCount} pts — click 1st vertex or dbl-click to close`);
+      ? (drawState === 'idle'         ? 'İlk köşeyi belirlemek için haritaya tıklayın'
+        : drawState === 'first_click' ? 'İkinci köşe için tekrar tıklayın'
+        : 'Dikdörtgen seçildi — Alanı Analiz Et\'e tıklayın')
+      : (drawState === 'done'         ? `Çokgen kapatıldı (${polyPointCount} nokta) — Alanı Analiz Et'e tıklayın`
+        : polyPointCount === 0        ? 'İlk köşeyi yerleştirmek için tıklayın'
+        : polyPointCount < 3          ? `${polyPointCount} nokta — ${3 - polyPointCount} nokta daha ekleyin`
+        : `${polyPointCount} nokta — 1. köşeye tıklayın veya çift tıklayarak kapatın`);
 
   const matBreakdown = result
     ? computeMaterialBreakdown(result.keyBreakdown, result.categoryBreakdown)
@@ -813,7 +814,7 @@ const QAPercentsPanel: React.FC<QAPercentsPanelProps> = ({
 
   return (
     <div id="percentsPanel">
-      <h3>Surface Distribution</h3>
+      <h3>Yüzey Dağılımı</h3>
 
       {/* Draw instructions */}
       <div className="qa-draw-hint-bar">
@@ -823,7 +824,7 @@ const QAPercentsPanel: React.FC<QAPercentsPanelProps> = ({
       {/* Material breakdown table */}
       {isAnalyzing ? (
         <div className="qa-empty-table">
-          <div className="qa-spinner-sm" /><p>Fetching OSM data…</p>
+          <div className="qa-spinner-sm" /><p>OSM verisi çekiliyor…</p>
         </div>
       ) : (
         <div className="percents-table-wrapper">
@@ -852,7 +853,7 @@ const QAPercentsPanel: React.FC<QAPercentsPanelProps> = ({
             </tbody>
           </table>
           {result && (
-            <p className="qa-feature-note">{result.featureCount} OSM features</p>
+            <p className="qa-feature-note">{result.featureCount} OSM özelliği</p>
           )}
         </div>
       )}
@@ -863,7 +864,7 @@ const QAPercentsPanel: React.FC<QAPercentsPanelProps> = ({
       <div className="percents-calculate-wrapper">
         <div className="qa-action-row">
           <button className="qa-reset-btn" onClick={onReset} disabled={drawState === 'idle'}>
-            Reset
+            Sıfırla
           </button>
           <button
             id="calculateBtn"
@@ -871,7 +872,7 @@ const QAPercentsPanel: React.FC<QAPercentsPanelProps> = ({
             onClick={onAnalyze}
             disabled={drawMode === null || drawState !== 'done' || isAnalyzing || (drawMode === 'poly' && polyPointCount < 3)}
           >
-            {isAnalyzing ? 'Analyzing…' : 'Analyze Area'}
+            {isAnalyzing ? 'Analiz ediliyor…' : 'Alanı Analiz Et'}
           </button>
         </div>
       </div>
@@ -960,7 +961,7 @@ const QAScoresPanel: React.FC<QAScoresPanelProps> = ({ result }) => {
   const risk = getRiskLevel(result.uhiScore);
   return (
     <div id="scoresPanel">
-      <h3>UHI Risk Score</h3>
+      <h3>UHI Risk Skoru</h3>
 
       {/* Barometer */}
       <div id="ucisSpeedometer">
@@ -995,18 +996,18 @@ const QAScoresPanel: React.FC<QAScoresPanelProps> = ({ result }) => {
 
       {/* SWOT */}
       <div className="strategies-section" style={{ marginTop: '20px' }}>
-        <h4 className="section-title">SWOT Analysis</h4>
+        <h4 className="section-title">SWOT Analizi</h4>
         <div className="analysis-grid qa-swot-grid-4">
-          <QASwotCard title="Strengths"     type="strengths"     items={result.swot.strengths} />
-          <QASwotCard title="Weaknesses"    type="weaknesses"    items={result.swot.weaknesses} />
-          <QASwotCard title="Opportunities" type="opportunities" items={result.swot.opportunities} />
-          <QASwotCard title="Threats"       type="threats"       items={result.swot.threats} />
+          <QASwotCard title="Güçlü Yönler"  type="strengths"     items={result.swot.strengths} />
+          <QASwotCard title="Zayıf Yönler" type="weaknesses"    items={result.swot.weaknesses} />
+          <QASwotCard title="Fırsatlar"    type="opportunities" items={result.swot.opportunities} />
+          <QASwotCard title="Tehditler"    type="threats"       items={result.swot.threats} />
         </div>
       </div>
 
       {/* Premium CTA */}
       <div className="qa-premium-cta-inline">
-        <p>Upgrade to Premium for physics-based simulation, scenario generation and exportable reports.</p>
+        <p>Fizik tabanlı simülasyon, senaryo üretimi ve dışa aktarılabilir raporlar için Premium'a yükseltin.</p>
       </div>
     </div>
   );
@@ -1017,7 +1018,7 @@ const QASwotCard: React.FC<QASwotCardProps> = ({ title, type, items }) => (
   <div className={`analysis-card ${type}`}>
     <div className="analysis-header"><h5>{title}</h5></div>
     <ul className="analysis-list">
-      {items.length > 0 ? items.map((item, i) => <li key={i}>{item}</li>) : <li style={{ opacity: 0.5 }}>None identified</li>}
+      {items.length > 0 ? items.map((item, i) => <li key={i}>{item}</li>) : <li style={{ opacity: 0.5 }}>Tespit edilemedi</li>}
     </ul>
   </div>
 );
@@ -1130,8 +1131,8 @@ const MainArea: React.FC<MainAreaProps> = ({
           east:  Math.max(corner1[1], corner2[1]),
         };
         const sz = (bbox.north - bbox.south) * (bbox.east - bbox.west);
-        if (sz > 0.01) { setQaError('Area too large — draw a smaller rectangle.'); setQaAnalyzing(false); return; }
-        if (sz < 1e-6) { setQaError('Area too small — draw a larger rectangle.');  setQaAnalyzing(false); return; }
+        if (sz > 0.01) { setQaError('Alan çok büyük — daha küçük bir dikdörtgen çizin.'); setQaAnalyzing(false); return; }
+        if (sz < 1e-6) { setQaError('Alan çok küçük — daha büyük bir dikdörtgen çizin.'); setQaAnalyzing(false); return; }
         analysisArea = bbox;
       } else {
         if (polyPoints.length < 3) return;
@@ -1140,7 +1141,7 @@ const MainArea: React.FC<MainAreaProps> = ({
       const res = await analyzeArea(analysisArea);
       setQaResult(res);
     } catch (err: any) {
-      setQaError(err?.message ?? 'Analysis failed. Please try again.');
+      setQaError(err?.message ?? 'Analiz başarısız. Lütfen tekrar deneyin.');
     } finally {
       setQaAnalyzing(false);
     }

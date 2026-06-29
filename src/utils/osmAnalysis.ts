@@ -148,18 +148,37 @@ function classifyElement(tags: Record<string, string>): string {
     return 'highway_service';
   }
 
-  // 3. Landuse
+  // 3. Landuse — expanded to cover many common OSM values that previously fell
+  //    through to 'default' and inflated the unknown/Asfalt buckets.
   if (tags.landuse) {
     const lu = tags.landuse;
+    // Forest / dense vegetation
     if (lu === 'forest') return 'landuse_forest';
-    if (lu === 'grass') return 'landuse_grass';
-    if (lu === 'meadow') return 'landuse_meadow';
+    // Open green
+    if (['grass', 'village_green'].includes(lu)) return 'landuse_grass';
+    if (['meadow', 'flowerbed'].includes(lu)) return 'landuse_meadow';
+    // Agriculture — treat as grass/low vegetation
+    if (['farmland', 'farm', 'orchard', 'vineyard', 'allotments', 'plant_nursery'].includes(lu)) return 'landuse_grass';
+    // Cemetery / burial grounds — mostly grass + trees + paths
+    if (['cemetery', 'grave_yard'].includes(lu)) return 'leisure_park';
+    // Parks / recreation inside landuse
+    if (['park', 'recreation_ground'].includes(lu)) return 'leisure_park';
+    // Built commercial / institutional
     if (lu === 'commercial') return 'landuse_commercial';
     if (lu === 'industrial') return 'landuse_industrial';
     if (lu === 'retail') return 'landuse_retail';
-    if (lu === 'residential') return 'landuse_residential';
+    if (['residential', 'garages'].includes(lu)) return 'landuse_residential';
+    if (['education', 'school', 'university', 'college'].includes(lu)) return 'landuse_commercial';
+    if (['healthcare', 'hospital'].includes(lu)) return 'landuse_commercial';
+    if (['religious', 'place_of_worship'].includes(lu)) return 'landuse_residential';
+    // Hard surfaces
     if (lu === 'parking') return 'landuse_parking';
-    if (['park', 'recreation_ground', 'greenfield'].includes(lu)) return 'leisure_park';
+    if (['railway', 'port', 'depot'].includes(lu)) return 'highway_service';
+    if (['military', 'aerodrome'].includes(lu)) return 'highway_service';
+    // Brownfield / construction — bare unpaved ground
+    if (['construction', 'brownfield', 'landfill', 'quarry'].includes(lu)) return 'surface_unpaved';
+    // Remaining greenfields / nature reserves
+    if (['greenfield', 'nature_reserve', 'conservation'].includes(lu)) return 'natural_grassland';
   }
 
   // 4. Natural features — tree nodes get leaf-type detail
@@ -167,7 +186,6 @@ function classifyElement(tags: Record<string, string>): string {
     const n = tags.natural;
     if (n === 'tree') return classifyTreeNode(tags);
     if (n === 'wood' || n === 'scrubland') {
-      // Forest polygons: use leaf type if available
       const lt = tags.leaf_type;
       const lc = tags.leaf_cycle;
       if (lc === 'deciduous' || lt === 'broadleaved') return 'tree_deciduous';
@@ -178,24 +196,39 @@ function classifyElement(tags: Record<string, string>): string {
     if (n === 'grassland' || n === 'heath') return 'natural_grassland';
     if (n === 'water') return 'natural_water';
     if (n === 'wetland') return 'natural_wetland';
+    if (['bare_rock', 'scree', 'cliff'].includes(n)) return 'surface_gravel';
+    if (['sand', 'beach', 'dune'].includes(n)) return 'surface_sand';
   }
 
-  // 5. Leisure
+  // 5. Leisure — expanded
   if (tags.leisure) {
     const l = tags.leisure;
-    if (l === 'park' || l === 'nature_reserve') return 'leisure_park';
+    if (['park', 'nature_reserve', 'cemetery', 'dog_park', 'playground',
+         'recreation_ground', 'common', 'forest'].includes(l)) return 'leisure_park';
     if (l === 'garden') return 'leisure_garden';
-    if (l === 'pitch' || l === 'sports_centre') return 'leisure_pitch';
+    if (['pitch', 'sports_centre', 'stadium', 'track'].includes(l)) return 'leisure_pitch';
+    if (['golf_course', 'disc_golf_course'].includes(l)) return 'leisure_park';
+    if (['swimming_pool', 'marina', 'water_park'].includes(l)) return 'natural_water';
   }
 
-  // 6. Waterway
+  // 6. Amenity areas — most fall to non-building classifications
+  if (tags.amenity) {
+    const a = tags.amenity;
+    if (['grave_yard', 'cemetery'].includes(a)) return 'leisure_park';
+    if (a === 'parking') return 'landuse_parking';
+    if (['school', 'university', 'college', 'hospital', 'clinic'].includes(a)) return 'landuse_commercial';
+    if (['place_of_worship', 'monastery'].includes(a)) return 'landuse_residential';
+    if (['park', 'community_centre'].includes(a)) return 'leisure_park';
+  }
+
+  // 7. Waterway
   if (tags.waterway) {
     const w = tags.waterway;
     if (w === 'river') return 'waterway_river';
     if (['stream', 'canal', 'drain', 'ditch'].includes(w)) return 'waterway_stream';
   }
 
-  // 7. Standalone surface=* areas (no other primary tag matched above)
+  // 8. Standalone surface=* areas (no other primary tag matched above)
   if (tags.surface) {
     const surf = classifySurface(tags.surface);
     if (surf) return surf;
@@ -209,6 +242,35 @@ function isClosedWay(geometry: LatLon[]): boolean {
   const first = geometry[0];
   const last = geometry[geometry.length - 1];
   return Math.abs(first.lat - last.lat) < 1e-7 && Math.abs(first.lon - last.lon) < 1e-7;
+}
+
+/**
+ * OSM returns the FULL geometry of a way even when only part of it falls inside
+ * the analysis bbox.  A large commercial-district landuse polygon that only clips
+ * 5 % of the analysis box would otherwise claim 80 % of the total area (the old
+ * hard clamp).  Instead, we scale the computed shoelace area down by the fraction
+ * of the polygon's own bounding box that overlaps the analysis bbox — a fast O(n)
+ * heuristic that requires no polygon-clipping library.
+ */
+function clipPolyAreaToBBox(areaDeg2: number, geom: LatLon[], ab: BBox): number {
+  let pN = -Infinity, pS = Infinity, pE = -Infinity, pW = Infinity;
+  for (const p of geom) {
+    if (p.lat > pN) pN = p.lat;
+    if (p.lat < pS) pS = p.lat;
+    if (p.lon > pE) pE = p.lon;
+    if (p.lon < pW) pW = p.lon;
+  }
+  const polyBoxArea = (pN - pS) * (pE - pW);
+  if (polyBoxArea <= 0) return areaDeg2;
+
+  const iN = Math.min(pN, ab.north);
+  const iS = Math.max(pS, ab.south);
+  const iE = Math.min(pE, ab.east);
+  const iW = Math.max(pW, ab.west);
+  if (iN <= iS || iE <= iW) return 0;
+
+  const fraction = ((iN - iS) * (iE - iW)) / polyBoxArea;
+  return areaDeg2 * fraction;
 }
 
 interface WeightedFeature {
@@ -230,6 +292,7 @@ function buildOverpassQuery(area: AnalysisArea): string {
   way["leisure"]${spatial};
   way["waterway"]${spatial};
   way["surface"]${spatial};
+  way["amenity"~"grave_yard|cemetery|parking|school|university|hospital|place_of_worship"]${spatial};
   node["natural"="tree"]${spatial};
   node["amenity"="parking"]${spatial};
 );
@@ -326,15 +389,18 @@ export async function analyzeArea(area: AnalysisArea): Promise<AnalysisResult> {
     } else if (el.type === 'way' && Array.isArray(el.geometry)) {
       const geom: LatLon[] = el.geometry.map((g: any) => ({ lat: g.lat, lon: g.lon }));
       if (isClosedWay(geom)) {
-        areaDeg2 = shoelaceAreaDeg2(geom);
+        // Scale the polygon area by how much of its bounding box overlaps the
+        // analysis bbox — prevents large district-level polygons from dominating.
+        areaDeg2 = clipPolyAreaToBBox(shoelaceAreaDeg2(geom), geom, bbox);
       } else {
         const width = HIGHWAY_WIDTHS_DEG[key] ?? 0.000041;
-        areaDeg2 = lineLength(geom) * width;
+        // For open ways (roads), clip the area similarly
+        areaDeg2 = clipPolyAreaToBBox(lineLength(geom) * width, geom, bbox);
       }
     }
 
-    // Clamp: single feature should not exceed 80% of the bbox
-    areaDeg2 = Math.min(areaDeg2, bboxArea * 0.80);
+    // Hard cap: no single feature exceeds 60% of bbox (guards against degenerate geometries)
+    areaDeg2 = Math.min(areaDeg2, bboxArea * 0.60);
 
     if (areaDeg2 > 0) {
       features.push({ key, params, areaDeg2 });
