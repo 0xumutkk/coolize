@@ -140,6 +140,9 @@ function classifyTreeNode(tags: Record<string, string>): string {
  *  Priority: roof:material → roof:shape (flat→concrete) → building type heuristic → default (tile). */
 function classifyRoofMaterial(tags: Record<string, string>): string {
   const rm = normalizeTagValue(tags['roof:material'] || '');
+  const bt = normalizeTagValue(tags.building || '');
+
+  if (bt === 'roof') return 'roof_metal';
 
   // Explicit roof:material tag
   if (rm) {
@@ -157,7 +160,6 @@ function classifyRoofMaterial(tags: Record<string, string>): string {
   if (rs === 'flat') return 'roof_concrete';
 
   // building type heuristics (when no explicit roof:material)
-  const bt = normalizeTagValue(tags.building || '');
   if (['industrial', 'warehouse', 'shed', 'hangar', 'barn'].includes(bt)) return 'roof_metal';
   if (['commercial', 'office', 'retail', 'supermarket', 'mall', 'hotel'].includes(bt)) return 'roof_concrete';
   if (['greenhouse'].includes(bt))   return 'roof_glass';
@@ -176,7 +178,20 @@ function classifyElement(tags: Record<string, string>): string {
   // 1. Buildings — classified by their roof material (top-down / 2-D view)
   if (tags.building && tags.building !== 'no') return classifyRoofMaterial(tags);
 
-  // 2. Highway — use surface tag for material accuracy when available
+  // 2. Lightweight transit canopies / platform covers. Do not classify every
+  // platform as metal: only covered elements or explicit roof structures.
+  const railway = normalizeTagValue(tags.railway || '');
+  const publicTransport = normalizeTagValue(tags.public_transport || '');
+  const covered = normalizeTagValue(tags.covered || '');
+  const shelterType = normalizeTagValue(tags.shelter_type || '');
+  if (
+    covered === 'yes' &&
+    (railway === 'platform' || publicTransport === 'platform' || shelterType === 'public_transport')
+  ) {
+    return 'roof_metal';
+  }
+
+  // 3. Highway — use surface tag for material accuracy when available
   if (tags.highway) {
     const h = normalizeTagValue(tags.highway);
     const surf = tags.surface ? classifySurface(tags.surface) : null;
@@ -194,7 +209,7 @@ function classifyElement(tags: Record<string, string>): string {
     return 'highway_service';
   }
 
-  // 3. Landuse — expanded to cover many common OSM values that previously fell
+  // 4. Landuse — expanded to cover many common OSM values that previously fell
   //    through to 'default' and inflated the unknown/Asfalt buckets.
   if (tags.landuse) {
     const lu = normalizeTagValue(tags.landuse);
@@ -226,7 +241,7 @@ function classifyElement(tags: Record<string, string>): string {
     if (['greenfield', 'nature_reserve', 'conservation'].includes(lu)) return 'natural_grassland';
   }
 
-  // 4. Natural features — tree nodes get leaf-type detail
+  // 5. Natural features — tree nodes get leaf-type detail
   if (tags.natural) {
     const n = normalizeTagValue(tags.natural);
     if (n === 'tree') return classifyTreeNode(tags);
@@ -321,6 +336,7 @@ interface WeightedFeature {
   key: string;
   params: FeatureParams;
   areaDeg2: number;
+  contextOnly?: boolean;
 }
 
 function areaCenter(area: AnalysisArea): LatLon {
@@ -349,7 +365,11 @@ function buildOverpassQuery(area: AnalysisArea): string {
 is_in(${center.lat},${center.lon})->.containing_areas;
 (
   way["building"]${spatial};
+  way["building"="roof"]${spatial};
   way["highway"]${spatial};
+  way["railway"="platform"]${spatial};
+  way["public_transport"="platform"]${spatial};
+  way["covered"="yes"]${spatial};
   way["landuse"]${spatial};
   way["natural"]["natural"!="tree"]${spatial};
   way["leisure"]${spatial};
@@ -463,6 +483,7 @@ export async function analyzeArea(area: AnalysisArea): Promise<AnalysisResult> {
 
   const bboxArea = (bbox.north - bbox.south) * (bbox.east - bbox.west);
   const features: WeightedFeature[] = [];
+  const contextOnlyFeatures: WeightedFeature[] = [];
 
   for (const el of elements) {
     const tags: Record<string, string> = el.tags || {};
@@ -471,8 +492,10 @@ export async function analyzeArea(area: AnalysisArea): Promise<AnalysisResult> {
 
     let areaDeg2 = 0;
 
-    if (el.type === 'area' && GREEN_CONTEXT_KEYS.has(key)) {
-      areaDeg2 = bboxArea;
+    const isGeometrylessGreenContext = GREEN_CONTEXT_KEYS.has(key) && (el.type === 'area' || !Array.isArray(el.geometry));
+    if (isGeometrylessGreenContext) {
+      contextOnlyFeatures.push({ key, params, areaDeg2: bboxArea, contextOnly: true });
+      continue;
     } else if (el.type === 'node') {
       areaDeg2 = TREE_NODE_AREA_DEG2;
     } else if (el.type === 'way' && Array.isArray(el.geometry)) {
@@ -498,6 +521,11 @@ export async function analyzeArea(area: AnalysisArea): Promise<AnalysisResult> {
   }
 
   // Sum all feature areas (can exceed bbox due to overlaps — normalise by max of sum or bbox)
+  const rawMappedArea = features.reduce((s, f) => s + f.areaDeg2, 0);
+  if (rawMappedArea < bboxArea * 0.05 && contextOnlyFeatures.length > 0) {
+    features.push(...contextOnlyFeatures);
+  }
+
   const totalArea = Math.max(features.reduce((s, f) => s + f.areaDeg2, 0), bboxArea);
 
   // Weighted sums for each dimension

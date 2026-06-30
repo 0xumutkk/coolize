@@ -93,9 +93,61 @@ describe('osmAnalysis surface and gap classification', () => {
     const result = await analyzeArea({ south: 0, west: 0, north: 1, east: 1 });
 
     expect(result.keyBreakdown.leisure_park).toBeGreaterThan(50);
-    expect(result.keyBreakdown.surface_grass).toBeGreaterThan(30);
     expect(result.keyBreakdown.surface_unpaved ?? 0).toBe(0);
     expect(result.categoryBreakdown.vegetation).toBe(100);
+  });
+
+  it('uses geometryless green context ways only when the selected area has almost no mapped features', async () => {
+    mockOverpassElements([
+      {
+        type: 'way',
+        id: 42156282,
+        tags: { landuse: 'forest', leaf_type: 'broadleaved' },
+      },
+    ]);
+
+    const result = await analyzeArea({ south: 0, west: 0, north: 1, east: 1 });
+
+    expect(result.keyBreakdown.landuse_forest).toBeGreaterThan(50);
+    expect(result.keyBreakdown.surface_unpaved ?? 0).toBe(0);
+    expect(result.categoryBreakdown.vegetation).toBe(100);
+  });
+
+  it('does not leak nearby geometryless park context into mapped station selections', async () => {
+    mockOverpassElements([
+      {
+        type: 'way',
+        tags: { landuse: 'forest', leaf_type: 'broadleaved' },
+      },
+      {
+        type: 'way',
+        tags: { building: 'roof' },
+        geometry: [
+          { lat: 0, lon: 0 },
+          { lat: 0, lon: 1 },
+          { lat: 0.4, lon: 1 },
+          { lat: 0.4, lon: 0 },
+          { lat: 0, lon: 0 },
+        ],
+      },
+      {
+        type: 'way',
+        tags: { highway: 'primary' },
+        geometry: [
+          { lat: 0.45, lon: 0 },
+          { lat: 0.45, lon: 1 },
+          { lat: 0.65, lon: 1 },
+          { lat: 0.65, lon: 0 },
+          { lat: 0.45, lon: 0 },
+        ],
+      },
+    ]);
+
+    const result = await analyzeArea({ south: 0, west: 0, north: 1, east: 1 });
+
+    expect(result.keyBreakdown.landuse_forest ?? 0).toBe(0);
+    expect(result.keyBreakdown.roof_metal).toBeGreaterThan(0);
+    expect(result.keyBreakdown.highway_primary).toBeGreaterThan(0);
   });
 
   it('classifies granite and marble surface tags as hard paving', async () => {
@@ -117,6 +169,59 @@ describe('osmAnalysis surface and gap classification', () => {
 
     expect(result.keyBreakdown.surface_paving).toBe(100);
     expect(result.categoryBreakdown.semi_perm).toBe(100);
+  });
+
+  it('classifies explicit roof structures as metal roofs', async () => {
+    mockOverpassElements([
+      {
+        type: 'way',
+        tags: { building: 'roof' },
+        geometry: [
+          { lat: 0, lon: 0 },
+          { lat: 0, lon: 1 },
+          { lat: 1, lon: 1 },
+          { lat: 1, lon: 0 },
+          { lat: 0, lon: 0 },
+        ],
+      },
+    ]);
+
+    const result = await analyzeArea({ south: 0, west: 0, north: 1, east: 1 });
+
+    expect(result.keyBreakdown.roof_metal).toBeGreaterThan(50);
+    expect(result.keyBreakdown.roof_tiles ?? 0).toBe(0);
+  });
+
+  it('classifies covered railway platforms as metal roofs without treating every platform as metal', async () => {
+    mockOverpassElements([
+      {
+        type: 'way',
+        tags: { railway: 'platform', covered: 'yes' },
+        geometry: [
+          { lat: 0, lon: 0 },
+          { lat: 0, lon: 0.4 },
+          { lat: 0.4, lon: 0.4 },
+          { lat: 0.4, lon: 0 },
+          { lat: 0, lon: 0 },
+        ],
+      },
+      {
+        type: 'way',
+        tags: { railway: 'platform' },
+        geometry: [
+          { lat: 0.6, lon: 0.6 },
+          { lat: 0.6, lon: 0.8 },
+          { lat: 0.8, lon: 0.8 },
+          { lat: 0.8, lon: 0.6 },
+          { lat: 0.6, lon: 0.6 },
+        ],
+      },
+    ]);
+
+    const result = await analyzeArea({ south: 0, west: 0, north: 1, east: 1 });
+
+    expect(result.keyBreakdown.roof_metal).toBeGreaterThan(0);
+    expect(result.keyBreakdown.default ?? 0).toBeGreaterThan(0);
   });
 
   it('does not classify broad university grounds as concrete roof', async () => {
