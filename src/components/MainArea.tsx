@@ -997,7 +997,22 @@ const QAScoresPanel: React.FC<QAScoresPanelProps> = ({ result }) => {
   const risk = getRiskLevel(result.uhiScore);
   return (
     <div id="scoresPanel">
-      <h3>UHI Risk Skoru</h3>
+      <div className="qa-score-title-row">
+        <h3>UHI Risk Skoru</h3>
+        <span className="qa-score-info-wrap">
+          <button
+            type="button"
+            className="qa-score-info-btn"
+            aria-label="UHI risk skoru hesaplama bilgisi"
+          >
+            i
+          </button>
+          <span className="qa-score-tooltip" role="tooltip">
+            <strong>Hesaplama formülü</strong>
+            <span>UHI Risk = 0.35 x Yüzey Isı Yükü + 0.25 x Morfoloji Riski + 0.20 x Bitki Eksikliği + 0.10 x Su Eksikliği + 0.10 x Kentsel Baskı.</span>
+          </span>
+        </span>
+      </div>
 
       {/* Barometer */}
       <div id="ucisSpeedometer">
