@@ -66,6 +66,8 @@ const DrawHandler: React.FC<DrawHandlerProps> = ({
     const el = map.getContainer();
     if (drawMode !== null && drawState !== 'done') {
       el.style.cursor = 'crosshair';
+    } else if (drawMode === null) {
+      el.style.cursor = 'grab';
     } else {
       el.style.cursor = '';
     }
@@ -235,6 +237,19 @@ const QADrawModeControls: React.FC<{
       onClick={() => onSetMode(drawMode === 'poly' ? null : 'poly')}
       title="Çokgen — köşelere tıkla, çift tıkla, sağ tıkla veya 1. noktaya tıkla"
     >⬡ Çokgen</button>
+    <button
+      className={`qa-draw-mode-btn qa-draw-mode-btn--icon${drawMode === null ? ' active' : ''}`}
+      onClick={() => onSetMode(null)}
+      title="Haritayı kaydır"
+      aria-label="Haritayı kaydır"
+    >
+      <svg className="qa-hand-tool-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M8.4 11.2V5.6a1.4 1.4 0 0 1 2.8 0v5.1" />
+        <path d="M11.2 10.7V4.4a1.4 1.4 0 0 1 2.8 0v6.3" />
+        <path d="M14 10.9V6.2a1.4 1.4 0 0 1 2.8 0v6" />
+        <path d="M16.8 12.2V8.7a1.4 1.4 0 0 1 2.8 0v6.1c0 3.4-2.6 5.7-6.1 5.7h-1.3c-2.2 0-3.8-.9-5.1-2.6L4.5 14.4a1.5 1.5 0 0 1 2.3-1.9l1.6 1.7v-3" />
+      </svg>
+    </button>
   </div>
 );
 
@@ -654,7 +669,7 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({
                 />
                 <QALocationSearch onLocationFound={onLocationFound} />
                 <QADrawModeControls drawMode={drawMode} onSetMode={onSetDrawMode} />
-                {drawMode === 'rect' && rectBounds && (
+                {rectBounds && (
                   <RLRectangle
                     bounds={rectBounds}
                     pathOptions={{
@@ -665,7 +680,7 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({
                     }}
                   />
                 )}
-                {drawMode === 'poly' && polyPoints.length >= 2 && (
+                {polyPoints.length >= 2 && (
                   <RLPolygon
                     positions={polyPoints}
                     pathOptions={{
@@ -817,7 +832,9 @@ const QAPercentsPanel: React.FC<QAPercentsPanelProps> = ({
   result, isAnalyzing, drawState, drawMode, polyPointCount, error, onAnalyze, onReset,
 }) => {
   const drawHint = drawMode === null
-    ? 'Çizime başlamak için Dikdörtgen veya Çokgen seçin'
+    ? (drawState === 'done'
+      ? 'El aracı aktif — seçili alan korunur, haritayı sürükleyebilirsiniz'
+      : 'Çizime başlamak için Dikdörtgen veya Çokgen seçin')
     : drawMode === 'rect'
       ? (drawState === 'idle'         ? 'İlk köşeyi belirlemek için haritaya tıklayın'
         : drawState === 'first_click' ? 'İkinci köşe için tekrar tıklayın'
@@ -889,7 +906,7 @@ const QAPercentsPanel: React.FC<QAPercentsPanelProps> = ({
             id="calculateBtn"
             className={drawState === 'done' && !isAnalyzing ? 'active' : 'disabled'}
             onClick={onAnalyze}
-            disabled={drawMode === null || drawState !== 'done' || isAnalyzing || (drawMode === 'poly' && polyPointCount < 3)}
+            disabled={drawState !== 'done' || isAnalyzing || (drawMode === 'poly' && polyPointCount < 3)}
           >
             {isAnalyzing ? 'Analiz ediliyor…' : 'Alanı Analiz Et'}
           </button>
@@ -1105,7 +1122,10 @@ const MainArea: React.FC<MainAreaProps> = ({
   };
 
   const handleToggleQA = () => { setIsQAMode(v => !v); resetDraw(); };
-  const handleSetDrawMode = (m: DrawMode) => { setDrawMode(m); resetDraw(); };
+  const handleSetDrawMode = (m: DrawMode) => {
+    setDrawMode(m);
+    if (m !== null) resetDraw();
+  };
 
   useEffect(() => { setMapKey(k => k + 1); }, [mapCenter]);
 
@@ -1141,7 +1161,7 @@ const MainArea: React.FC<MainAreaProps> = ({
     setQaAnalyzing(true); setQaError(null); setQaResult(null);
     try {
       let analysisArea: BBox | PolyArea;
-      if (drawMode === 'rect') {
+      if (corner1 && corner2) {
         if (!corner1 || !corner2) return;
         const bbox: BBox = {
           south: Math.min(corner1[0], corner2[0]),
@@ -1154,7 +1174,7 @@ const MainArea: React.FC<MainAreaProps> = ({
         if (sz < 1e-6) { setQaError('Alan çok küçük — daha büyük bir dikdörtgen çizin.'); setQaAnalyzing(false); return; }
         analysisArea = bbox;
       } else {
-        if (polyPoints.length < 3) return;
+        if (polyPoints.length < 3 || drawState !== 'done') return;
         analysisArea = { points: polyPoints.map(([lat, lon]) => ({ lat, lon })) };
       }
       const res = await analyzeArea(analysisArea);

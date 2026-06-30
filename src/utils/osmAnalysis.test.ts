@@ -34,6 +34,70 @@ describe('osmAnalysis surface and gap classification', () => {
     expect(result.keyBreakdown.surface_unpaved ?? 0).toBe(0);
   });
 
+  it('does not let sparse mapped park paths turn the whole selection into paving', async () => {
+    mockOverpassElements([
+      {
+        type: 'way',
+        tags: { highway: 'footway' },
+        geometry: [
+          { lat: 0.48, lon: 0.1 },
+          { lat: 0.52, lon: 0.9 },
+        ],
+      },
+    ]);
+
+    const result = await analyzeArea({ south: 0, west: 0, north: 1, east: 1 });
+
+    expect(result.keyBreakdown.surface_grass).toBeGreaterThan(90);
+    expect(result.keyBreakdown.surface_paving ?? 0).toBe(0);
+  });
+
+  it('uses enclosing green context to fill untagged park selections as vegetation', async () => {
+    mockOverpassElements([
+      {
+        type: 'way',
+        tags: { leisure: 'park' },
+        geometry: [
+          { lat: -0.1, lon: -0.1 },
+          { lat: -0.1, lon: 1.1 },
+          { lat: 1.1, lon: 1.1 },
+          { lat: 1.1, lon: -0.1 },
+          { lat: -0.1, lon: -0.1 },
+        ],
+      },
+      {
+        type: 'way',
+        tags: { highway: 'footway' },
+        geometry: [
+          { lat: 0.48, lon: 0.1 },
+          { lat: 0.52, lon: 0.9 },
+        ],
+      },
+    ]);
+
+    const result = await analyzeArea({ south: 0, west: 0, north: 1, east: 1 });
+
+    expect(result.keyBreakdown.leisure_park).toBeGreaterThan(50);
+    expect(result.keyBreakdown.surface_grass).toBeGreaterThan(30);
+    expect(result.categoryBreakdown.vegetation).toBe(100);
+  });
+
+  it('uses containing Overpass areas when the park polygon nodes are outside the selection', async () => {
+    mockOverpassElements([
+      {
+        type: 'area',
+        tags: { leisure: 'park', name: 'Large Park' },
+      },
+    ]);
+
+    const result = await analyzeArea({ south: 0, west: 0, north: 1, east: 1 });
+
+    expect(result.keyBreakdown.leisure_park).toBeGreaterThan(50);
+    expect(result.keyBreakdown.surface_grass).toBeGreaterThan(30);
+    expect(result.keyBreakdown.surface_unpaved ?? 0).toBe(0);
+    expect(result.categoryBreakdown.vegetation).toBe(100);
+  });
+
   it('classifies granite and marble surface tags as hard paving', async () => {
     mockOverpassElements([
       {

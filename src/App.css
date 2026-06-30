@@ -2867,6 +2867,25 @@ label {
 }
 .qa-draw-mode-btn:hover { background: #f1f5f9; color: #1e293b; }
 .qa-draw-mode-btn.active { background: #2563eb; color: white; }
+.qa-draw-mode-btn--icon {
+  width: 30px;
+  padding: 5px 0;
+  line-height: 1;
+  margin-left: 6px;
+  border-left: 1px solid #e2e8f0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.qa-hand-tool-icon {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
 
 /* ── 3. QA Map Fullscreen Button ────────────────────────── */
 .qa-map-fullscreen-btn {

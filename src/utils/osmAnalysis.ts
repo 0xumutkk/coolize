@@ -79,6 +79,18 @@ const URBAN_SEMI_PERM_KEYS = new Set([
   'surface_wood_deck',
 ]);
 
+const GREEN_CONTEXT_KEYS = new Set([
+  'landuse_forest',
+  'landuse_grass',
+  'landuse_meadow',
+  'natural_wood',
+  'natural_scrub',
+  'natural_grassland',
+  'leisure_park',
+  'leisure_garden',
+  'leisure_pitch',
+]);
+
 function normalizeTagValue(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, '_');
 }
@@ -305,11 +317,30 @@ interface WeightedFeature {
   areaDeg2: number;
 }
 
+function areaCenter(area: AnalysisArea): LatLon {
+  if (isBBox(area)) {
+    return {
+      lat: (area.south + area.north) / 2,
+      lon: (area.west + area.east) / 2,
+    };
+  }
+  return {
+    lat: area.points.reduce((sum, p) => sum + p.lat, 0) / area.points.length,
+    lon: area.points.reduce((sum, p) => sum + p.lon, 0) / area.points.length,
+  };
+}
+
 function buildOverpassQuery(area: AnalysisArea): string {
   const spatial = isBBox(area)
     ? `(${area.south},${area.west},${area.north},${area.east})`
     : `(poly:"${area.points.map(p => `${p.lat} ${p.lon}`).join(' ')}")`;
+  const bbox = isBBox(area) ? area : polyToBBox(area.points);
+  const center = areaCenter(area);
+  const latPad = (bbox.north - bbox.south) * 2;
+  const lonPad = (bbox.east - bbox.west) * 2;
+  const greenContextSpatial = `(${bbox.south - latPad},${bbox.west - lonPad},${bbox.north + latPad},${bbox.east + lonPad})`;
   return `[out:json][timeout:25];
+is_in(${center.lat},${center.lon})->.containing_areas;
 (
   way["building"]${spatial};
   way["highway"]${spatial};
@@ -319,6 +350,12 @@ function buildOverpassQuery(area: AnalysisArea): string {
   way["waterway"]${spatial};
   way["surface"]${spatial};
   way["amenity"~"grave_yard|cemetery|parking|school|university|hospital|place_of_worship"]${spatial};
+  way["landuse"~"forest|grass|meadow|flowerbed|orchard|nature_reserve|conservation|park|recreation_ground"]${greenContextSpatial};
+  way["natural"~"wood|scrub|grassland|heath|wetland"]${greenContextSpatial};
+  way["leisure"~"park|garden|nature_reserve|recreation_ground|common|forest|playground"]${greenContextSpatial};
+  area.containing_areas["landuse"~"forest|grass|meadow|flowerbed|orchard|nature_reserve|conservation|park|recreation_ground"];
+  area.containing_areas["natural"~"wood|scrub|grassland|heath|wetland"];
+  area.containing_areas["leisure"~"park|garden|nature_reserve|recreation_ground|common|forest|playground"];
   node["natural"="tree"]${spatial};
 );
 out geom;`;
@@ -428,7 +465,9 @@ export async function analyzeArea(area: AnalysisArea): Promise<AnalysisResult> {
 
     let areaDeg2 = 0;
 
-    if (el.type === 'node') {
+    if (el.type === 'area' && GREEN_CONTEXT_KEYS.has(key)) {
+      areaDeg2 = bboxArea;
+    } else if (el.type === 'node') {
       areaDeg2 = TREE_NODE_AREA_DEG2;
     } else if (el.type === 'way' && Array.isArray(el.geometry)) {
       const geom: LatLon[] = el.geometry.map((g: any) => ({ lat: g.lat, lon: g.lon }));
@@ -488,25 +527,34 @@ export async function analyzeArea(area: AnalysisArea): Promise<AnalysisResult> {
     const identifiedWater      = (categoryAreas['water']      || 0) / identifiedArea;
     const identifiedUrbanSemiPerm = Array.from(URBAN_SEMI_PERM_KEYS)
       .reduce((sum, key) => sum + (keyAreas[key] || 0), 0) / identifiedArea;
+    const identifiedGreenContext = Array.from(GREEN_CONTEXT_KEYS)
+      .reduce((sum, key) => sum + (keyAreas[key] || 0), 0) / identifiedArea;
 
     // In urban areas (>30% built, road, or hard pedestrian context) untagged
     // gaps are mostly paved squares, sidewalks, courtyards, and alleys.
     // In green areas (>30% vegetation) untagged gaps lean toward grass/soil.
     const urbanRatio = identifiedBuilding + identifiedImpervious + identifiedUrbanSemiPerm;
-    const greenRatio = identifiedVegetation + identifiedWater;
+    const greenRatio = identifiedVegetation + identifiedWater + identifiedGreenContext;
+    const isSparsePedestrianOnly =
+      coveredRatio < 0.05 &&
+      identifiedUrbanSemiPerm >= 0.60 &&
+      identifiedBuilding < 0.10 &&
+      identifiedImpervious < 0.10;
 
     let gapHeatLoad: number, gapCooling: number, gapMorph: number;
     let gapCategory: string;
 
     let gapKey: string;
-    if (urbanRatio >= 0.30) {
+    if (greenRatio >= 0.30 || isSparsePedestrianOnly) {
+      // Parks often contain only mapped paths inside a small selection, while
+      // the enclosing park polygon sits outside the bbox nodes. Avoid letting a
+      // few footways convert the whole green patch into paving.
+      gapHeatLoad = 0.18; gapCooling = 0.42; gapMorph = 0.00;
+      gapCategory = 'vegetation'; gapKey = 'surface_grass';
+    } else if (urbanRatio >= 0.30) {
       // Urban gap → sidewalks, courtyards, small alleys → paving
       gapHeatLoad = 0.68; gapCooling = 0.08; gapMorph = 0.12;
       gapCategory = 'semi_perm'; gapKey = 'surface_paving';
-    } else if (greenRatio >= 0.30) {
-      // Green-dominant gap → grass / soil
-      gapHeatLoad = 0.18; gapCooling = 0.42; gapMorph = 0.00;
-      gapCategory = 'semi_perm'; gapKey = 'surface_grass';
     } else {
       // Mixed/neutral → unpaved
       gapHeatLoad = 0.45; gapCooling = 0.20; gapMorph = 0.08;
