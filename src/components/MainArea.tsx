@@ -50,6 +50,11 @@ const DrawHandler: React.FC<DrawHandlerProps> = ({
     if (includePoint) onPolyPoint(lat, lon);
     onPolyClose();
   }, [onPolyClose, onPolyPoint]);
+  const getEventLatLng = (e: any): { lat: number; lng: number } | null => {
+    const lat = e?.latlng?.lat;
+    const lng = e?.latlng?.lng;
+    return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
+  };
 
   // Drag & cursor: disable pan while a draw mode is active
   useEffect(() => {
@@ -87,45 +92,52 @@ const DrawHandler: React.FC<DrawHandlerProps> = ({
     click(e: any) {
       if (drawMode === null) return;    // pan mode — ignore clicks
       if (drawState === 'done') return; // already finalized
+      const latlng = getEventLatLng(e);
+      if (!latlng) return;
 
       if (drawMode === 'rect') {
-        if (drawState === 'idle') onFirstClick(e.latlng.lat, e.latlng.lng);
-        else if (drawState === 'first_click') onSecondClick(e.latlng.lat, e.latlng.lng);
+        if (drawState === 'idle') onFirstClick(latlng.lat, latlng.lng);
+        else if (drawState === 'first_click') onSecondClick(latlng.lat, latlng.lng);
       } else {
         // Poly: snap-to-close when clicking near the first vertex (≤18 px)
         if (polyPoints.length >= 3) {
           const first = L.latLng(polyPoints[0][0], polyPoints[0][1]);
           const px0  = map.latLngToContainerPoint(first);
-          const pxC  = map.latLngToContainerPoint(e.latlng);
+          const pxC  = map.latLngToContainerPoint(latlng);
           const dist = Math.hypot(px0.x - pxC.x, px0.y - pxC.y);
           if (dist <= 18) { onPolyClose(); return; }
         }
         if (clickTimer.current) clearTimeout(clickTimer.current);
         clickTimer.current = setTimeout(() => {
-          onPolyPoint(e.latlng.lat, e.latlng.lng);
+          onPolyPoint(latlng.lat, latlng.lng);
         }, 220);
       }
     },
     dblclick(e: any) {
       if (drawMode === 'poly' && drawState !== 'done') {
+        const latlng = getEventLatLng(e);
         // Double-click is commonly used to place the final vertex and close.
-        if (polyPoints.length >= 2) finishPolyAt(e.latlng.lat, e.latlng.lng, true);
+        if (latlng && polyPoints.length >= 2) finishPolyAt(latlng.lat, latlng.lng, true);
         L.DomEvent.stop(e);
       }
     },
     contextmenu(e: any) {
       if (drawMode === 'poly' && drawState !== 'done') {
+        const latlng = getEventLatLng(e);
+        if (!latlng) return;
         // Right-click finishes with existing vertices; if only two exist, use
         // the right-click point as the third/final vertex.
-        if (polyPoints.length >= 3) finishPolyAt(e.latlng.lat, e.latlng.lng, false);
-        else if (polyPoints.length === 2) finishPolyAt(e.latlng.lat, e.latlng.lng, true);
+        if (polyPoints.length >= 3) finishPolyAt(latlng.lat, latlng.lng, false);
+        else if (polyPoints.length === 2) finishPolyAt(latlng.lat, latlng.lng, true);
         L.DomEvent.stop(e);
       }
     },
     mousemove(e: any) {
       if (drawState === 'done') return;
-      if (drawMode === 'rect' && drawState === 'first_click') onMouseMove(e.latlng.lat, e.latlng.lng);
-      if (drawMode === 'poly' && drawState === 'first_click') onPolyPreview(e.latlng.lat, e.latlng.lng);
+      const latlng = getEventLatLng(e);
+      if (!latlng) return;
+      if (drawMode === 'rect' && drawState === 'first_click') onMouseMove(latlng.lat, latlng.lng);
+      if (drawMode === 'poly' && drawState === 'first_click') onPolyPreview(latlng.lat, latlng.lng);
     },
   });
 

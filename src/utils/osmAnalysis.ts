@@ -48,6 +48,12 @@ function lineLength(coords: LatLon[]): number {
   return len;
 }
 
+function toValidGeometry(geometry: any[]): LatLon[] {
+  return geometry
+    .map((g: any) => ({ lat: Number(g?.lat), lon: Number(g?.lon) }))
+    .filter((g: LatLon) => Number.isFinite(g.lat) && Number.isFinite(g.lon));
+}
+
 const HIGHWAY_WIDTHS_DEG: Record<string, number> = {
   highway_primary:     0.000095,
   highway_secondary:   0.000082,
@@ -470,7 +476,8 @@ export async function analyzeArea(area: AnalysisArea): Promise<AnalysisResult> {
     } else if (el.type === 'node') {
       areaDeg2 = TREE_NODE_AREA_DEG2;
     } else if (el.type === 'way' && Array.isArray(el.geometry)) {
-      const geom: LatLon[] = el.geometry.map((g: any) => ({ lat: g.lat, lon: g.lon }));
+      const geom = toValidGeometry(el.geometry);
+      if (geom.length < 2) continue;
       if (isClosedWay(geom)) {
         // Scale the polygon area by how much of its bounding box overlaps the
         // analysis bbox — prevents large district-level polygons from dominating.
