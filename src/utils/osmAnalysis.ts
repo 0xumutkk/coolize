@@ -97,6 +97,28 @@ const GREEN_CONTEXT_KEYS = new Set([
   'leisure_pitch',
 ]);
 
+const GREEN_GAP_FILL_KEYS = new Set([
+  ...Array.from(GREEN_CONTEXT_KEYS),
+  'surface_grass',
+]);
+
+const CAMPUS_OPEN_CONTEXT_VALUES = new Set([
+  'university',
+  'college',
+  'school',
+  'education',
+  'institutional',
+]);
+
+const WATER_CONTEXT_KEYS = new Set([
+  'natural_water',
+  'natural_wetland',
+  'natural_coastline',
+  'waterway_river',
+  'waterway_stream',
+  'waterway_canal',
+]);
+
 function normalizeTagValue(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, '_');
 }
@@ -255,6 +277,7 @@ function classifyElement(tags: Record<string, string>): string {
     if (n === 'scrub') return 'natural_scrub';
     if (n === 'grassland' || n === 'heath') return 'natural_grassland';
     if (n === 'water') return 'natural_water';
+    if (n === 'coastline') return 'natural_coastline';
     if (n === 'wetland') return 'natural_wetland';
     if (['bare_rock', 'scree', 'cliff'].includes(n)) return 'surface_gravel';
     if (['sand', 'beach', 'dune'].includes(n)) return 'surface_sand';
@@ -332,6 +355,32 @@ function clipPolyAreaToBBox(areaDeg2: number, geom: LatLon[], ab: BBox): number 
   return areaDeg2 * fraction;
 }
 
+function elementCenter(el: any): LatLon | null {
+  const lat = Number(el?.center?.lat);
+  const lon = Number(el?.center?.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  return { lat, lon };
+}
+
+function isLocalContext(el: any, bbox: BBox): boolean {
+  const center = elementCenter(el);
+  if (!center) return true;
+  const latPad = Math.max((bbox.north - bbox.south) * 8, 0.005);
+  const lonPad = Math.max((bbox.east - bbox.west) * 8, 0.005);
+  return (
+    center.lat >= bbox.south - latPad &&
+    center.lat <= bbox.north + latPad &&
+    center.lon >= bbox.west - lonPad &&
+    center.lon <= bbox.east + lonPad
+  );
+}
+
+function isCampusOpenContext(tags: Record<string, string>): boolean {
+  const amenity = normalizeTagValue(tags.amenity || '');
+  const landuse = normalizeTagValue(tags.landuse || '');
+  return CAMPUS_OPEN_CONTEXT_VALUES.has(amenity) || CAMPUS_OPEN_CONTEXT_VALUES.has(landuse);
+}
+
 interface WeightedFeature {
   key: string;
   params: FeatureParams;
@@ -376,12 +425,25 @@ is_in(${center.lat},${center.lon})->.containing_areas;
   way["waterway"]${spatial};
   way["surface"]${spatial};
   way["amenity"~"grave_yard|cemetery|parking|school|university|hospital|place_of_worship"]${spatial};
+  way["amenity"~"university|college|school"]${greenContextSpatial};
+  way["landuse"~"education|university|institutional"]${greenContextSpatial};
+  way["natural"="coastline"]${greenContextSpatial};
+  way["natural"="water"]${greenContextSpatial};
+  way["water"]${greenContextSpatial};
+  relation["natural"="water"]${greenContextSpatial};
+  relation["water"]${greenContextSpatial};
   way["landuse"~"forest|grass|meadow|flowerbed|orchard|nature_reserve|conservation|park|recreation_ground"]${greenContextSpatial};
   way["natural"~"wood|scrub|grassland|heath|wetland"]${greenContextSpatial};
   way["leisure"~"park|garden|nature_reserve|recreation_ground|common|forest|playground"]${greenContextSpatial};
   area.containing_areas["landuse"~"forest|grass|meadow|flowerbed|orchard|nature_reserve|conservation|park|recreation_ground"];
   area.containing_areas["natural"~"wood|scrub|grassland|heath|wetland"];
   area.containing_areas["leisure"~"park|garden|nature_reserve|recreation_ground|common|forest|playground"];
+  area.containing_areas["amenity"~"university|college|school"];
+  area.containing_areas["landuse"~"education|university|institutional"];
+  relation["landuse"]${greenContextSpatial};
+  relation["leisure"]${greenContextSpatial};
+  relation["natural"]${greenContextSpatial};
+  relation["amenity"~"university|college|school"]${greenContextSpatial};
   node["natural"="tree"]${spatial};
 );
 out geom;`;
@@ -484,6 +546,8 @@ export async function analyzeArea(area: AnalysisArea): Promise<AnalysisResult> {
   const bboxArea = (bbox.north - bbox.south) * (bbox.east - bbox.west);
   const features: WeightedFeature[] = [];
   const contextOnlyFeatures: WeightedFeature[] = [];
+  const waterContextFeatures: WeightedFeature[] = [];
+  const campusContextFeatures: WeightedFeature[] = [];
 
   for (const el of elements) {
     const tags: Record<string, string> = el.tags || {};
@@ -492,7 +556,19 @@ export async function analyzeArea(area: AnalysisArea): Promise<AnalysisResult> {
 
     let areaDeg2 = 0;
 
+    const isWaterContext = WATER_CONTEXT_KEYS.has(key);
     const isGeometrylessGreenContext = GREEN_CONTEXT_KEYS.has(key) && (el.type === 'area' || !Array.isArray(el.geometry));
+    if (!isLocalContext(el, bbox) && (isGeometrylessGreenContext || isCampusOpenContext(tags))) {
+      continue;
+    }
+    if (isCampusOpenContext(tags) && (el.type === 'area' || !Array.isArray(el.geometry))) {
+      campusContextFeatures.push({ key: 'surface_grass', params: OSM_PARAMETER_MAP['surface_grass'], areaDeg2: bboxArea, contextOnly: true });
+      continue;
+    }
+    if (isWaterContext && (el.type === 'area' || key === 'natural_coastline' || !Array.isArray(el.geometry))) {
+      waterContextFeatures.push({ key: 'natural_water', params: OSM_PARAMETER_MAP['natural_water'], areaDeg2: bboxArea, contextOnly: true });
+      continue;
+    }
     if (isGeometrylessGreenContext) {
       contextOnlyFeatures.push({ key, params, areaDeg2: bboxArea, contextOnly: true });
       continue;
@@ -522,7 +598,11 @@ export async function analyzeArea(area: AnalysisArea): Promise<AnalysisResult> {
 
   // Sum all feature areas (can exceed bbox due to overlaps — normalise by max of sum or bbox)
   const rawMappedArea = features.reduce((s, f) => s + f.areaDeg2, 0);
-  if (rawMappedArea < bboxArea * 0.05 && contextOnlyFeatures.length > 0) {
+  if (rawMappedArea < bboxArea * 0.05 && waterContextFeatures.length > 0) {
+    features.push(waterContextFeatures[0]);
+  } else if (rawMappedArea < bboxArea * 0.05 && campusContextFeatures.length > 0) {
+    features.push(campusContextFeatures[0]);
+  } else if (rawMappedArea < bboxArea * 0.05 && contextOnlyFeatures.length > 0) {
     features.push(...contextOnlyFeatures);
   }
 
@@ -558,18 +638,17 @@ export async function analyzeArea(area: AnalysisArea): Promise<AnalysisResult> {
     const identifiedArea = Math.max(rawFeatureSum, Number.EPSILON);
     const identifiedBuilding   = (categoryAreas['building']   || 0) / identifiedArea;
     const identifiedImpervious = (categoryAreas['impervious'] || 0) / identifiedArea;
-    const identifiedVegetation = (categoryAreas['vegetation'] || 0) / identifiedArea;
     const identifiedWater      = (categoryAreas['water']      || 0) / identifiedArea;
     const identifiedUrbanSemiPerm = Array.from(URBAN_SEMI_PERM_KEYS)
       .reduce((sum, key) => sum + (keyAreas[key] || 0), 0) / identifiedArea;
-    const identifiedGreenContext = Array.from(GREEN_CONTEXT_KEYS)
+    const identifiedGreenGapContext = Array.from(GREEN_GAP_FILL_KEYS)
       .reduce((sum, key) => sum + (keyAreas[key] || 0), 0) / identifiedArea;
 
     // In urban areas (>30% built, road, or hard pedestrian context) untagged
     // gaps are mostly paved squares, sidewalks, courtyards, and alleys.
     // In green areas (>30% vegetation) untagged gaps lean toward grass/soil.
     const urbanRatio = identifiedBuilding + identifiedImpervious + identifiedUrbanSemiPerm;
-    const greenRatio = identifiedVegetation + identifiedWater + identifiedGreenContext;
+    const greenRatio = identifiedWater + identifiedGreenGapContext;
     const isSparsePedestrianOnly =
       coveredRatio < 0.05 &&
       identifiedUrbanSemiPerm >= 0.60 &&
@@ -580,7 +659,10 @@ export async function analyzeArea(area: AnalysisArea): Promise<AnalysisResult> {
     let gapCategory: string;
 
     let gapKey: string;
-    if (greenRatio >= 0.30 || isSparsePedestrianOnly) {
+    if (rawFeatureSum <= 0) {
+      gapHeatLoad = 0.50; gapCooling = 0.20; gapMorph = 0.20;
+      gapCategory = 'unknown'; gapKey = 'default';
+    } else if (greenRatio >= 0.30 || isSparsePedestrianOnly) {
       // Parks often contain only mapped paths inside a small selection, while
       // the enclosing park polygon sits outside the bbox nodes. Avoid letting a
       // few footways convert the whole green patch into paving.

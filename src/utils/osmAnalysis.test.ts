@@ -12,6 +12,47 @@ describe('osmAnalysis surface and gap classification', () => {
     global.fetch = jest.fn();
   });
 
+  it('keeps completely unmapped selections unknown instead of inventing gravel', async () => {
+    mockOverpassElements([]);
+
+    const result = await analyzeArea({ south: 0, west: 0, north: 1, east: 1 });
+
+    expect(result.keyBreakdown.default).toBe(100);
+    expect(result.categoryBreakdown.unknown).toBe(100);
+    expect(result.keyBreakdown.surface_unpaved ?? 0).toBe(0);
+  });
+
+  it('uses local campus context as open green fallback when mapped garden geometry is missing', async () => {
+    mockOverpassElements([
+      {
+        type: 'area',
+        tags: { amenity: 'university', name: 'Campus' },
+        center: { lat: 0.5, lon: 0.5 },
+      },
+    ]);
+
+    const result = await analyzeArea({ south: 0, west: 0, north: 1, east: 1 });
+
+    expect(result.keyBreakdown.surface_grass).toBe(100);
+    expect(result.keyBreakdown.default ?? 0).toBe(0);
+    expect(result.keyBreakdown.surface_unpaved ?? 0).toBe(0);
+  });
+
+  it('ignores far-away is_in green context instead of treating it as the selected area', async () => {
+    mockOverpassElements([
+      {
+        type: 'way',
+        tags: { landuse: 'forest' },
+        center: { lat: -22.4694, lon: -104.3536 },
+      },
+    ]);
+
+    const result = await analyzeArea({ south: 0, west: 0, north: 1, east: 1 });
+
+    expect(result.keyBreakdown.default).toBe(100);
+    expect(result.keyBreakdown.landuse_forest ?? 0).toBe(0);
+  });
+
   it('treats hard pedestrian context as urban paving for gap fill', async () => {
     mockOverpassElements([
       {
@@ -50,6 +91,35 @@ describe('osmAnalysis surface and gap classification', () => {
 
     expect(result.keyBreakdown.surface_grass).toBeGreaterThan(90);
     expect(result.keyBreakdown.surface_paving ?? 0).toBe(0);
+  });
+
+  it('does not let sparse tree nodes turn an urban square gap into mostly grass', async () => {
+    mockOverpassElements([
+      {
+        type: 'node',
+        tags: { natural: 'tree' },
+      },
+      {
+        type: 'node',
+        tags: { natural: 'tree' },
+      },
+      {
+        type: 'way',
+        tags: { highway: 'pedestrian' },
+        geometry: [
+          { lat: 0.2, lon: 0.2 },
+          { lat: 0.2, lon: 0.5 },
+          { lat: 0.5, lon: 0.5 },
+          { lat: 0.5, lon: 0.2 },
+          { lat: 0.2, lon: 0.2 },
+        ],
+      },
+    ]);
+
+    const result = await analyzeArea({ south: 0, west: 0, north: 1, east: 1 });
+
+    expect(result.keyBreakdown.surface_grass ?? 0).toBe(0);
+    expect(result.keyBreakdown.surface_paving).toBeGreaterThan(50);
   });
 
   it('uses enclosing green context to fill untagged park selections as vegetation', async () => {
@@ -148,6 +218,54 @@ describe('osmAnalysis surface and gap classification', () => {
     expect(result.keyBreakdown.landuse_forest ?? 0).toBe(0);
     expect(result.keyBreakdown.roof_metal).toBeGreaterThan(0);
     expect(result.keyBreakdown.highway_primary).toBeGreaterThan(0);
+  });
+
+  it('uses nearby coastline context as water when a sea selection has no mapped features', async () => {
+    mockOverpassElements([
+      {
+        type: 'way',
+        tags: { natural: 'coastline' },
+        geometry: [
+          { lat: 0.2, lon: -0.2 },
+          { lat: 0.8, lon: -0.2 },
+        ],
+      },
+    ]);
+
+    const result = await analyzeArea({ south: 0, west: 0, north: 1, east: 1 });
+
+    expect(result.keyBreakdown.natural_water).toBeGreaterThan(50);
+    expect(result.keyBreakdown.surface_unpaved ?? 0).toBe(0);
+    expect(result.categoryBreakdown.water).toBe(100);
+  });
+
+  it('does not leak coastline water context into mapped land selections', async () => {
+    mockOverpassElements([
+      {
+        type: 'way',
+        tags: { natural: 'coastline' },
+        geometry: [
+          { lat: 0.2, lon: -0.2 },
+          { lat: 0.8, lon: -0.2 },
+        ],
+      },
+      {
+        type: 'way',
+        tags: { building: 'roof' },
+        geometry: [
+          { lat: 0, lon: 0 },
+          { lat: 0, lon: 1 },
+          { lat: 0.4, lon: 1 },
+          { lat: 0.4, lon: 0 },
+          { lat: 0, lon: 0 },
+        ],
+      },
+    ]);
+
+    const result = await analyzeArea({ south: 0, west: 0, north: 1, east: 1 });
+
+    expect(result.keyBreakdown.natural_water ?? 0).toBe(0);
+    expect(result.keyBreakdown.roof_metal).toBeGreaterThan(0);
   });
 
   it('classifies granite and marble surface tags as hard paving', async () => {

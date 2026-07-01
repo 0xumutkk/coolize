@@ -55,6 +55,46 @@ body:not(.landing-active) {
   display: flex;
   flex: 1;
   overflow: hidden;
+  position: relative;
+}
+
+.sidebar-toggle-btn {
+  position: absolute;
+  top: 14px;
+  left: 268px;
+  z-index: 1100;
+  width: 28px;
+  height: 36px;
+  border: 1px solid rgba(85, 107, 47, 0.16);
+  border-radius: 0 8px 8px 0;
+  background: rgba(255, 255, 255, 0.94);
+  color: #556b2f;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.12);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: left 0.18s ease, background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.sidebar-toggle-btn span {
+  font-size: 24px;
+  line-height: 1;
+  transform: translateY(-1px);
+}
+
+.sidebar-toggle-btn:hover,
+.sidebar-toggle-btn:focus-visible {
+  background: #eef6e7;
+  color: #2f3f1a;
+  outline: none;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.16);
+}
+
+#app-content.sidebar-hidden .sidebar-toggle-btn {
+  left: 0;
+  border-radius: 0 8px 8px 0;
 }
 
 /* Top Navbar Styles */
@@ -4016,6 +4056,11 @@ label {
 @media (max-width: 900px) {
   #app-container {
     flex-direction: column;
+  }
+
+  .sidebar-toggle-btn {
+    top: 10px;
+    left: 0;
   }
 
   #sidebar {

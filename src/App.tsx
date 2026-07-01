@@ -12,6 +12,7 @@ type SelectedLocation = { name: string; lat: number; lon: number } | null;
 function App() {
   const [showApp, setShowApp] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<SelectedLocation>(null);
+  const [isSidebarHidden, setIsSidebarHidden] = useState(false);
 
   useEffect(() => {
     if (!showApp) document.body.classList.add('landing-active');
@@ -41,16 +42,27 @@ function App() {
   return (
     <div id="app-container">
       <TopNavbar onLogout={() => setShowApp(false)} onMyWorks={() => {}} />
-      <div id="app-content">
-        <Sidebar
-          gridSize={gridSize}
-          setGridSize={setGridSize}
-          currentClass={currentClass}
-          setCurrentClass={setCurrentClass}
-          setBaseImageSrc={setBaseImageSrc}
-          onLocationSelect={setSelectedLocation}
-          selectedLocation={selectedLocation}
-        />
+      <div id="app-content" className={isSidebarHidden ? 'sidebar-hidden' : ''}>
+        <button
+          type="button"
+          className="sidebar-toggle-btn"
+          onClick={() => setIsSidebarHidden(prev => !prev)}
+          aria-label={isSidebarHidden ? 'Show sidebar' : 'Hide sidebar'}
+          title={isSidebarHidden ? 'Show sidebar' : 'Hide sidebar'}
+        >
+          <span aria-hidden="true">{isSidebarHidden ? '›' : '‹'}</span>
+        </button>
+        {!isSidebarHidden && (
+          <Sidebar
+            gridSize={gridSize}
+            setGridSize={setGridSize}
+            currentClass={currentClass}
+            setCurrentClass={setCurrentClass}
+            setBaseImageSrc={setBaseImageSrc}
+            onLocationSelect={setSelectedLocation}
+            selectedLocation={selectedLocation}
+          />
+        )}
         <MainArea
           gridSize={gridSize}
           gridClasses={gridClasses}
