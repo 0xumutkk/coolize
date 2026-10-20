@@ -400,4 +400,95 @@ describe('osmAnalysis surface and gap classification', () => {
     expect(result.swot.opportunities.some(item => item.includes('Cadde boyunca'))).toBe(false);
     expect(result.swot.threats.some(item => item.includes('kampüs'))).toBe(true);
   });
+
+  it('retries next mirror when Overpass returns a runtime timeout remark with empty elements', async () => {
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          remark: 'runtime error: Query timed out in "query" at line 12 after 25 seconds.',
+          elements: [],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          elements: [
+            {
+              type: 'way',
+              id: 101,
+              tags: { building: 'apartments', 'building:levels': '6' },
+              geometry: [
+                { lat: 0, lon: 0 },
+                { lat: 0, lon: 0.5 },
+                { lat: 0.5, lon: 0.5 },
+                { lat: 0.5, lon: 0 },
+                { lat: 0, lon: 0 },
+              ],
+            },
+          ],
+        }),
+      });
+
+    const result = await analyzeArea({ south: 0, west: 0, north: 1, east: 1 });
+
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+    expect(result.keyBreakdown.roof_concrete).toBeGreaterThan(0);
+    expect(result.categoryBreakdown.unknown ?? 0).toBe(0);
+  });
+
+  it('deduplicates ways returned in both primary geometry and context center blocks', async () => {
+    mockOverpassElements([
+      {
+        type: 'way',
+        id: 555,
+        tags: { leisure: 'park' },
+        geometry: [
+          { lat: 0, lon: 0 },
+          { lat: 0, lon: 0.2 },
+          { lat: 0.2, lon: 0.2 },
+          { lat: 0.2, lon: 0 },
+          { lat: 0, lon: 0 },
+        ],
+      },
+      {
+        type: 'way',
+        id: 555,
+        tags: { leisure: 'park' },
+        center: { lat: 0.1, lon: 0.1 },
+      },
+    ]);
+
+    const result = await analyzeArea({ south: 0, west: 0, north: 1, east: 1 });
+
+    expect(result.featureCount).toBe(1);
+    expect(result.keyBreakdown.leisure_park).toBeGreaterThan(0);
+  });
+
+  it('normalizes OSM API v0.6 map.json node-referenced ways and multipolygon relations', async () => {
+    mockOverpassElements([
+      { type: 'node', id: 1, lat: 0, lon: 0 },
+      { type: 'node', id: 2, lat: 0, lon: 0.6 },
+      { type: 'node', id: 3, lat: 0.6, lon: 0.6 },
+      { type: 'node', id: 4, lat: 0.6, lon: 0 },
+      { type: 'node', id: 99, lat: 0.2, lon: 0.2, tags: { natural: 'tree', leaf_cycle: 'deciduous' } },
+      { type: 'node', id: 100, lat: 0.3, lon: 0.3, tags: { shop: 'bakery' } },
+      {
+        type: 'way',
+        id: 10,
+        nodes: [1, 2, 3, 4, 1],
+      },
+      {
+        type: 'relation',
+        id: 20,
+        tags: { type: 'multipolygon', building: 'commercial' },
+        members: [{ type: 'way', ref: 10, role: 'outer' }],
+      },
+    ]);
+
+    const result = await analyzeArea({ south: 0, west: 0, north: 1, east: 1 });
+
+    expect(result.featureCount).toBe(2); // 1 resolved building way + 1 tree node (shop node & vertex nodes ignored)
+    expect(result.keyBreakdown.roof_concrete).toBeGreaterThan(20);
+  });
 });

@@ -401,20 +401,13 @@ function areaCenter(area: AnalysisArea): LatLon {
   };
 }
 
-function buildOverpassQuery(area: AnalysisArea): string {
+function buildCoreOverpassQuery(area: AnalysisArea): string {
   const spatial = isBBox(area)
     ? `(${area.south},${area.west},${area.north},${area.east})`
     : `(poly:"${area.points.map(p => `${p.lat} ${p.lon}`).join(' ')}")`;
-  const bbox = isBBox(area) ? area : polyToBBox(area.points);
-  const center = areaCenter(area);
-  const latPad = (bbox.north - bbox.south) * 2;
-  const lonPad = (bbox.east - bbox.west) * 2;
-  const greenContextSpatial = `(${bbox.south - latPad},${bbox.west - lonPad},${bbox.north + latPad},${bbox.east + lonPad})`;
-  return `[out:json][timeout:25];
-is_in(${center.lat},${center.lon})->.containing_areas;
+  return `[out:json][timeout:15];
 (
   way["building"]${spatial};
-  way["building"="roof"]${spatial};
   way["highway"]${spatial};
   way["railway"="platform"]${spatial};
   way["public_transport"="platform"]${spatial};
@@ -424,29 +417,52 @@ is_in(${center.lat},${center.lon})->.containing_areas;
   way["leisure"]${spatial};
   way["waterway"]${spatial};
   way["surface"]${spatial};
-  way["amenity"~"grave_yard|cemetery|parking|school|university|hospital|place_of_worship"]${spatial};
-  way["amenity"~"university|college|school"]${greenContextSpatial};
-  way["landuse"~"education|university|institutional"]${greenContextSpatial};
-  way["natural"="coastline"]${greenContextSpatial};
-  way["natural"="water"]${greenContextSpatial};
-  way["water"]${greenContextSpatial};
-  relation["natural"="water"]${greenContextSpatial};
-  relation["water"]${greenContextSpatial};
-  way["landuse"~"forest|grass|meadow|flowerbed|orchard|nature_reserve|conservation|park|recreation_ground"]${greenContextSpatial};
-  way["natural"~"wood|scrub|grassland|heath|wetland"]${greenContextSpatial};
-  way["leisure"~"park|garden|nature_reserve|recreation_ground|common|forest|playground"]${greenContextSpatial};
-  area.containing_areas["landuse"~"forest|grass|meadow|flowerbed|orchard|nature_reserve|conservation|park|recreation_ground"];
-  area.containing_areas["natural"~"wood|scrub|grassland|heath|wetland"];
-  area.containing_areas["leisure"~"park|garden|nature_reserve|recreation_ground|common|forest|playground"];
-  area.containing_areas["amenity"~"university|college|school"];
-  area.containing_areas["landuse"~"education|university|institutional"];
-  relation["landuse"]${greenContextSpatial};
-  relation["leisure"]${greenContextSpatial};
-  relation["natural"]${greenContextSpatial};
-  relation["amenity"~"university|college|school"]${greenContextSpatial};
+  way["amenity"~"grave_yard|cemetery|parking|school|university|college|hospital|clinic|place_of_worship|monastery|park|community_centre"]${spatial};
   node["natural"="tree"]${spatial};
 );
 out geom;`;
+}
+
+function buildOverpassQuery(area: AnalysisArea): string {
+  const spatial = isBBox(area)
+    ? `(${area.south},${area.west},${area.north},${area.east})`
+    : `(poly:"${area.points.map(p => `${p.lat} ${p.lon}`).join(' ')}")`;
+  const bbox = isBBox(area) ? area : polyToBBox(area.points);
+  const center = areaCenter(area);
+  const latPad = Math.min(Math.max((bbox.north - bbox.south) * 0.5, 0.0005), 0.003);
+  const lonPad = Math.min(Math.max((bbox.east - bbox.west) * 0.5, 0.0005), 0.003);
+  const greenContextSpatial = `(${bbox.south - latPad},${bbox.west - lonPad},${bbox.north + latPad},${bbox.east + lonPad})`;
+  return `[out:json][timeout:15];
+(
+  way["building"]${spatial};
+  way["highway"]${spatial};
+  way["railway"="platform"]${spatial};
+  way["public_transport"="platform"]${spatial};
+  way["covered"="yes"]${spatial};
+  way["landuse"]${spatial};
+  way["natural"]["natural"!="tree"]${spatial};
+  way["leisure"]${spatial};
+  way["waterway"]${spatial};
+  way["surface"]${spatial};
+  way["amenity"~"grave_yard|cemetery|parking|school|university|college|hospital|clinic|place_of_worship|monastery|park|community_centre"]${spatial};
+  node["natural"="tree"]${spatial};
+);
+out geom;
+is_in(${center.lat},${center.lon})->.containing_areas;
+(
+  area.containing_areas["landuse"~"forest|grass|meadow|flowerbed|orchard|nature_reserve|conservation|park|recreation_ground|education|university|institutional"];
+  area.containing_areas["natural"~"wood|scrub|grassland|heath|wetland|water"];
+  area.containing_areas["leisure"~"park|garden|nature_reserve|recreation_ground|common|forest|playground"];
+  area.containing_areas["amenity"~"university|college|school"];
+  way["amenity"~"university|college|school"]${greenContextSpatial};
+  way["landuse"~"forest|grass|meadow|flowerbed|orchard|nature_reserve|conservation|park|recreation_ground|education|university|institutional"]${greenContextSpatial};
+  way["natural"~"coastline|water|wood|scrub|grassland|heath|wetland"]${greenContextSpatial};
+  way["water"]${greenContextSpatial};
+  way["leisure"~"park|garden|nature_reserve|recreation_ground|common|forest|playground"]${greenContextSpatial};
+  relation["natural"="water"]${greenContextSpatial};
+  relation["water"]${greenContextSpatial};
+);
+out tags center;`;
 }
 
 function polyToBBox(points: Array<{ lat: number; lon: number }>): BBox {
@@ -460,14 +476,202 @@ function polyToBBox(points: Array<{ lat: number; lon: number }>): BBox {
 
 const TREE_NODE_AREA_DEG2 = 0.000000028; // ~25m² canopy proxy in degrees²
 const OVERPASS_ENDPOINTS = [
+  'https://overpass.private.coffee/api/interpreter',
   'https://overpass.kumi.systems/api/interpreter',
   'https://overpass-api.de/api/interpreter',
-  'https://overpass.osm.ch/api/interpreter',
 ];
+
+const RELEVANT_AMENITY_RE =
+  /^(grave_yard|cemetery|parking|school|university|college|hospital|clinic|place_of_worship|monastery|park|community_centre)$/i;
+
+function hasRelevantWayTags(tags: Record<string, string>): boolean {
+  if (tags.tunnel === 'yes' || tags.indoor === 'yes') return false;
+  if (tags.building && tags.building !== 'no') return true;
+  if (tags.highway) return true;
+  if (tags.railway === 'platform' || tags.public_transport === 'platform') return true;
+  if (tags.covered === 'yes') return true;
+  if (tags.landuse) return true;
+  if (tags.natural && tags.natural !== 'tree') return true;
+  if (tags.leisure) return true;
+  if (tags.waterway || tags.water) return true;
+  if (tags.surface) return true;
+  if (tags.amenity && RELEVANT_AMENITY_RE.test(tags.amenity.trim())) return true;
+  return false;
+}
+
+function pointInPolygon(pt: LatLon, poly: LatLon[]): boolean {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const xi = poly[i].lon, yi = poly[i].lat;
+    const xj = poly[j].lon, yj = poly[j].lat;
+    const intersect =
+      (yi > pt.lat) !== (yj > pt.lat) &&
+      pt.lon < ((xj - xi) * (pt.lat - yi)) / (yj - yi + Number.EPSILON) + xi;
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+function geomOverlapsBBox(geom: LatLon[], ab: BBox): boolean {
+  let pN = -Infinity, pS = Infinity, pE = -Infinity, pW = Infinity;
+  for (const p of geom) {
+    if (p.lat > pN) pN = p.lat;
+    if (p.lat < pS) pS = p.lat;
+    if (p.lon > pE) pE = p.lon;
+    if (p.lon < pW) pW = p.lon;
+  }
+  return Math.min(pN, ab.north) > Math.max(pS, ab.south) &&
+         Math.min(pE, ab.east) > Math.max(pW, ab.west);
+}
+
+function geometryCenter(geom: LatLon[]): LatLon {
+  let lat = 0, lon = 0;
+  for (const p of geom) {
+    lat += p.lat;
+    lon += p.lon;
+  }
+  return { lat: lat / geom.length, lon: lon / geom.length };
+}
+
+/**
+ * Normalizes elements from either Overpass QL (`out geom;` / `out tags center;`)
+ * or official OpenStreetMap API v0.6 (`/api/0.6/map.json`, where ways reference
+ * node IDs in `el.nodes`).
+ */
+function normalizeOSMElements(rawElements: any[], area: AnalysisArea, bbox: BBox): any[] {
+  const isMapJsonFormat = rawElements.some(
+    (el: any) =>
+      (el?.type === 'way' && Array.isArray(el.nodes) && !Array.isArray(el.geometry)) ||
+      (el?.type === 'node' && el.id != null && (!el.tags || normalizeTagValue(el.tags.natural || '') !== 'tree'))
+  );
+
+  if (!isMapJsonFormat) {
+    const elementsById = new Map<string, any>();
+    const elements: any[] = [];
+    for (const el of rawElements) {
+      if (el?.id == null) {
+        elements.push(el);
+        continue;
+      }
+      const mapKey = `${el.type}:${el.id}`;
+      const existing = elementsById.get(mapKey);
+      if (!existing) {
+        elementsById.set(mapKey, el);
+        elements.push(el);
+      } else if (!Array.isArray(existing.geometry) && Array.isArray(el.geometry)) {
+        const idx = elements.indexOf(existing);
+        if (idx !== -1) elements[idx] = el;
+        elementsById.set(mapKey, el);
+      }
+    }
+    return elements;
+  }
+
+  // 1. Index node coordinates and ways by ID
+  const nodeCoords = new Map<number, LatLon>();
+  const waysById = new Map<number, any>();
+  for (const el of rawElements) {
+    if (el?.type === 'node' && el.id != null && Number.isFinite(Number(el.lat)) && Number.isFinite(Number(el.lon))) {
+      nodeCoords.set(Number(el.id), { lat: Number(el.lat), lon: Number(el.lon) });
+    } else if (el?.type === 'way' && el.id != null) {
+      waysById.set(Number(el.id), { ...el, tags: el.tags ? { ...el.tags } : undefined });
+    }
+  }
+
+  // 2. Propagate multipolygon relation tags onto untagged outer member ways
+  for (const el of rawElements) {
+    if (el?.type === 'relation' && el.tags && hasRelevantWayTags(el.tags) && Array.isArray(el.members)) {
+      for (const m of el.members) {
+        if (m?.type === 'way' && (!m.role || m.role === 'outer')) {
+          const memberWay = waysById.get(Number(m.ref));
+          if (memberWay && (!memberWay.tags || !hasRelevantWayTags(memberWay.tags))) {
+            memberWay.tags = { ...el.tags, ...(memberWay.tags || {}) };
+          }
+        }
+      }
+    }
+  }
+
+  const normalized: any[] = [];
+
+  // 3. Emit tree nodes inside the selected area
+  for (const el of rawElements) {
+    if (el?.type === 'node' && el.tags && normalizeTagValue(el.tags.natural || '') === 'tree') {
+      const lat = Number(el.lat);
+      const lon = Number(el.lon);
+      if (Number.isFinite(lat) && Number.isFinite(lon)) {
+        if (lat < bbox.south || lat > bbox.north || lon < bbox.west || lon > bbox.east) continue;
+        if (!isBBox(area) && !pointInPolygon({ lat, lon }, area.points)) continue;
+      }
+      normalized.push(el);
+    }
+  }
+
+  // 4. Emit ways with resolved geometry (or as context if in the outer padding)
+  for (const el of Array.from(waysById.values())) {
+    const tags: Record<string, string> | undefined = el.tags;
+    if (!tags || !hasRelevantWayTags(tags)) continue;
+
+    const geometry: LatLon[] = Array.isArray(el.geometry)
+      ? toValidGeometry(el.geometry)
+      : Array.isArray(el.nodes)
+      ? el.nodes
+          .map((nid: number) => nodeCoords.get(Number(nid)))
+          .filter((pt: LatLon | undefined): pt is LatLon => Boolean(pt))
+      : [];
+
+    if (geometry.length < 2) continue;
+
+    const overlapsBBox = geomOverlapsBBox(geometry, bbox);
+    const overlapsPoly =
+      isBBox(area) ||
+      geometry.some(pt => pointInPolygon(pt, area.points)) ||
+      (isClosedWay(geometry) && area.points.some(pt => pointInPolygon(pt, geometry)));
+
+    if (overlapsBBox && overlapsPoly) {
+      normalized.push({ ...el, geometry });
+    } else {
+      const key = classifyElement(tags);
+      if (WATER_CONTEXT_KEYS.has(key) || GREEN_CONTEXT_KEYS.has(key) || isCampusOpenContext(tags)) {
+        normalized.push({
+          type: 'way',
+          id: el.id,
+          tags,
+          center: geometryCenter(geometry),
+        });
+      }
+    }
+  }
+
+  // 5. Emit relations as context fallback
+  for (const el of rawElements) {
+    if (el?.type === 'relation' && el.tags) {
+      const key = classifyElement(el.tags);
+      if (WATER_CONTEXT_KEYS.has(key) || GREEN_CONTEXT_KEYS.has(key) || isCampusOpenContext(el.tags)) {
+        normalized.push({
+          type: 'relation',
+          id: el.id,
+          tags: el.tags,
+          center: el.center,
+        });
+      }
+    }
+  }
+
+  return normalized;
+}
+
+function isOverpassRuntimeError(data: any): boolean {
+  return Boolean(
+    data &&
+    typeof data.remark === 'string' &&
+    (!Array.isArray(data.elements) || data.elements.length === 0)
+  );
+}
 
 function overpassErrorMessage(err: unknown): string {
   const message = err instanceof Error ? err.message : String(err);
-  if (message.includes('504') || message.includes('timeout')) {
+  if (message.includes('504') || message.includes('timeout') || message.includes('abort')) {
     return 'OpenStreetMap veri servisi zaman aşımına uğradı. Lütfen tekrar deneyin veya biraz daha küçük bir alan seçin.';
   }
   if (message.includes('429')) {
@@ -476,44 +680,67 @@ function overpassErrorMessage(err: unknown): string {
   return 'OpenStreetMap verisi alınamadı. İnternet bağlantısını kontrol edip tekrar deneyin.';
 }
 
-/** Calls the /api/overpass Vercel proxy (avoids CORS issues in production).
- *  Falls back to a direct Overpass request for local dev where the proxy isn't running. */
-async function fetchOSMData(query: string): Promise<any> {
-  // In production, always use the server-side proxy
-  const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+/** Calls the /api/overpass proxy first (mounted on both Vercel and local webpack dev server),
+ *  then falls back to direct Overpass mirror requests if the proxy fails. */
+async function fetchOSMData(query: string, bbox: BBox, endpointTimeoutMs = 12_000): Promise<any> {
+  let lastErr: unknown;
 
-  if (!isLocalDev) {
-    // Production: route through Vercel serverless function
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 35_000);
-    try {
-      const res = await fetch('/api/overpass', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query }),
-        signal: ctrl.signal,
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err?.error ?? `Proxy error ${res.status}`);
-      }
-      return await res.json();
-    } catch (err: any) {
-      const isAbort = err?.name === 'AbortError' || err?.message?.includes('abort');
-      if (isAbort) throw new Error('İstek zaman aşımına uğradı. Tekrar deneyin veya daha küçük bir alan çizin.');
-      throw err;
-    } finally {
-      clearTimeout(timer);
+  // 1. Primary path: /api/overpass (uses official OSM API v0.6 map.json server-side in <1s)
+  const proxyCtrl = new AbortController();
+  const proxyTimer = setTimeout(() => proxyCtrl.abort(), 18_000);
+  try {
+    const res = await fetch('/api/overpass', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, bbox }),
+      signal: proxyCtrl.signal,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err?.error ?? `Proxy error ${res.status}`);
     }
+    const data = await res.json();
+    if (isOverpassRuntimeError(data)) {
+      throw new Error('Overpass runtime timeout');
+    }
+    return data;
+  } catch (err: any) {
+    lastErr = err;
+  } finally {
+    clearTimeout(proxyTimer);
   }
 
-  // Local dev: call Overpass directly. POST is more reliable than a long
-  // querystring URL and lets us fail over cleanly between public mirrors.
-  let lastErr: unknown;
+  // 2. Secondary path: direct browser request to official OSM API v0.6 map.json
+  const latSpan = bbox.north - bbox.south;
+  const lonSpan = bbox.east - bbox.west;
+  const padLat = latSpan < 0.003 ? Math.min(Math.max(latSpan * 0.5, 0.0008), 0.0015) : 0;
+  const padLon = lonSpan < 0.003 ? Math.min(Math.max(lonSpan * 0.5, 0.0008), 0.0015) : 0;
+  const mapUrl = `https://api.openstreetmap.org/api/0.6/map.json?bbox=${bbox.west - padLon},${bbox.south - padLat},${bbox.east + padLon},${bbox.north + padLat}`;
+  const mapCtrl = new AbortController();
+  const mapTimer = setTimeout(() => mapCtrl.abort(), endpointTimeoutMs);
+  try {
+    const res = await fetch(mapUrl, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      signal: mapCtrl.signal,
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (isOverpassRuntimeError(data)) {
+      throw new Error('Overpass runtime timeout');
+    }
+    return data;
+  } catch (err) {
+    lastErr = err;
+  } finally {
+    clearTimeout(mapTimer);
+  }
+
+  // 3. Fallback: direct Overpass mirrors
   const postBody = `data=${encodeURIComponent(query)}`;
   for (const endpoint of OVERPASS_ENDPOINTS) {
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 28_000);
+    const timer = setTimeout(() => ctrl.abort(), endpointTimeoutMs);
     try {
       const res = await Promise.race([
         fetch(endpoint, {
@@ -522,10 +749,14 @@ async function fetchOSMData(query: string): Promise<any> {
           body: postBody,
           signal: ctrl.signal,
         }),
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 29_000)),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), endpointTimeoutMs + 1_000)),
       ]) as Response;
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return await res.json();
+      const data = await res.json();
+      if (isOverpassRuntimeError(data)) {
+        throw new Error('Overpass runtime timeout');
+      }
+      return data;
     } catch (err) {
       lastErr = err;
     } finally {
@@ -540,8 +771,20 @@ export async function analyzeArea(area: AnalysisArea): Promise<AnalysisResult> {
   // Bounding box for area calculations
   const bbox: BBox = isBBox(area) ? area : polyToBBox(area.points);
 
-  const data = await fetchOSMData(query);
-  const elements: any[] = data.elements || [];
+  let data: any;
+  try {
+    data = await fetchOSMData(query, bbox);
+  } catch (firstErr) {
+    const fallbackQuery = buildCoreOverpassQuery(area);
+    try {
+      data = await fetchOSMData(fallbackQuery, bbox, 10_000);
+    } catch {
+      throw firstErr;
+    }
+  }
+
+  const rawElements: any[] = data.elements || [];
+  const elements = normalizeOSMElements(rawElements, area, bbox);
 
   const bboxArea = (bbox.north - bbox.south) * (bbox.east - bbox.west);
   const features: WeightedFeature[] = [];

@@ -1202,6 +1202,11 @@ const MainArea: React.FC<MainAreaProps> = ({
         analysisArea = bbox;
       } else {
         if (polyPoints.length < 3 || drawState !== 'done') return;
+        const lats = polyPoints.map(([lat]) => lat);
+        const lons = polyPoints.map(([, lon]) => lon);
+        const sz = (Math.max(...lats) - Math.min(...lats)) * (Math.max(...lons) - Math.min(...lons));
+        if (sz > 0.01) { setQaError('Alan çok büyük — daha küçük bir çokgen çizin.'); setQaAnalyzing(false); return; }
+        if (sz < 1e-6) { setQaError('Alan çok küçük — daha büyük bir çokgen çizin.'); setQaAnalyzing(false); return; }
         analysisArea = { points: polyPoints.map(([lat, lon]) => ({ lat, lon })) };
       }
       const res = await analyzeArea(analysisArea);
